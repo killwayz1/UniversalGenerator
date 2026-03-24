@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, jsonify, send_file
 import os
 import shutil
 import string
-import pandas as pd
 import requests
 import re
 import ssl
@@ -14,9 +13,7 @@ import json
 import tempfile
 import gdown
 import base64
-from PIL import Image
 from collections import Counter
-from bs4 import BeautifulSoup
 
 sys.setrecursionlimit(10000)
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -3172,6 +3169,11 @@ def index():
 
 @app.route('/generate', methods=['POST'])
 def generate_site():
+# Добавляем импорты СЮДА:
+    import pandas as pd
+    from PIL import Image
+    from bs4 import BeautifulSoup
+    
     domain = request.form.get('domain')
     site_name = request.form.get('site_name')
     aff_url = request.form.get('aff_url')

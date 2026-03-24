@@ -21,7 +21,7 @@ from bs4 import BeautifulSoup
 sys.setrecursionlimit(10000)
 ssl._create_default_https_context = ssl._create_unverified_context
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='.')
 
 
 # ============================================================

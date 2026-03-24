@@ -3281,6 +3281,9 @@ def generate_site():
             shift_elements(dst_site_dir)
 
         # Упаковываем в ZIP
+        shutil.make_archive(dst_site_dir, 'zip', dst_site_dir)
+
+        # Удаляем распакованную папку, чтобы не забивать память сервера
         shutil.rmtree(dst_site_dir)
 
         print(f"✅ Готово! Сайт {domain} собран и уникализирован (движок: {engine}).")

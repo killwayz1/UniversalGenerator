@@ -3170,6 +3170,7 @@ def index():
 @app.route('/generate', methods=['POST'])
 def generate_site():
 # Добавляем импорты СЮДА:
+    global pd, Image, BeautifulSoup
     import pandas as pd
     from PIL import Image
     from bs4 import BeautifulSoup

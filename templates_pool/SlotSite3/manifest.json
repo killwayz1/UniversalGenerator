@@ -1,0 +1,42 @@
+{
+    "name": "Wolf Gold Slot Guide: Play Now | Sugar Rush Slot 1000",
+    "short_name": "Wolf Gold",
+    "description": "Wolf Gold: Learn mechanics, RTP ranges and safer bankroll habits | Wolf Gold Slot sweet cluster-slot tips, compare versions, and start playing today",
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "scope": "/",
+    "icons": [
+        {
+            "src": "/image/fav.png",
+            "sizes": "72x72",
+            "type": "image/png"
+        },
+        {
+            "src": "/image/fav.png",
+            "sizes": "96x96",
+            "type": "image/png"
+        },
+        {
+            "src": "/image/fav.png",
+            "sizes": "128x128",
+            "type": "image/png"
+        },
+        {
+            "src": "/image/fav.png",
+            "sizes": "144x144",
+            "type": "image/png"
+        },
+        {
+            "src": "/image/fav.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/image/fav.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

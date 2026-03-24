@@ -1,0 +1,113 @@
+body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #f3f4f6;
+    color: #1f2937;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding-top: 50px;
+    margin: 0;
+    box-sizing: border-box;
+}
+
+.container {
+    background: #ffffff;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    width: 100%;
+    max-width: 550px;
+}
+
+h1 {
+    font-size: 26px;
+    margin-top: 0;
+    margin-bottom: 24px;
+    text-align: center;
+    color: #111827;
+}
+
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.input-group input,
+.input-group select {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+    background-color: #f9fafb;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+button {
+    width: 100%;
+    background-color: #3b82f6;
+    color: white;
+    padding: 14px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    margin-top: 10px;
+}
+
+button:hover {
+    background-color: #2563eb;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+button:disabled {
+    background-color: #9ca3af;
+    cursor: not-allowed;
+    transform: none;
+}
+
+#resultBox {
+    margin-top: 24px;
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 15px;
+    line-height: 1.5;
+    display: none;
+    font-weight: 500;
+}
+
+.success {
+    background-color: #ecfdf5;
+    color: #065f46;
+    border: 1px solid #34d399;
+    display: block !important;
+}
+
+.error {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #f87171;
+    display: block !important;
+}

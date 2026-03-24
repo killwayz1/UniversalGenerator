@@ -1,0 +1,423 @@
+.img_back {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.img_back::after {
+  content: "";
+  background-color: #00000047;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.img_back img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+
+
+.elementor-element-1f571a3e p,
+.elementor-element-48c75930 p,
+.elementor-element-7ebdadba,
+.elementor-element-8f659fe p {
+  color: #fff;
+}
+
+.elementor-kit-9 a {
+  display: inline-block;
+  margin: 0 .1rem;
+  color: #fff;
+}
+
+.elementor-element-300d2fd6 .e-con-inner {
+  gap: 0;
+}
+
+/* Основной контейнер */
+.auto-faq {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 800px;
+  margin: 0 auto;
+  font-family: sans-serif;
+}
+
+/* Заголовок FAQ (H2) */
+.auto-faq h2 {
+  margin-bottom: 20px;
+}
+
+/* Вопросы (H3) - делаем их кликабельными */
+.auto-faq h3 {
+  margin: 0 0 1rem;
+  border-radius: 1rem;
+  cursor: pointer;
+  background-color: #f1f1f1;
+  padding: 15px;
+  border-bottom: 1px solid #ddd;
+  position: relative;
+  padding-right: 40px;
+  /* Место для иконки */
+  transition: background-color 0.3s;
+}
+
+.auto-faq h3:hover {
+  background-color: #e9e9e9;
+}
+
+/* Иконка плюсика через CSS */
+.auto-faq h3::after {
+  content: '+';
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  font-weight: bold;
+}
+
+/* Когда вопрос открыт (класс active добавляет JS) */
+
+
+.auto-faq h3.active::after {
+  content: '-';
+  /* Меняем плюс на минус */
+}
+
+/* Ответы (P) - скрыты по умолчанию */
+.auto-faq p {
+  border-radius: 1rem;
+
+  margin: 0 0 1rem;
+  display: none;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-top: none;
+  background-color: #fff;
+  line-height: 1.6;
+}
+
+
+.elementor-element-38d745aa {
+  height: fit-content;
+}
+
+.elementor-element-48eb6136 {
+  align-items: center;
+}
+
+.elementor-item-active {
+  font-weight: bold;
+}
+
+.elementor-142 .elementor-element.elementor-element-4bea36fb img {
+  width: 100%;
+  max-width: 8rem;
+}
+
+.elementor-element-38d745aa{
+  width: 100% !important;
+  max-width: 20rem;
+}
+
+
+
+
+
+@media (min-width: 768px) {
+  .img_flex {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+
+  .img_flex img {
+    width: 50%;
+  }
+
+  .hfe-nav-menu {
+    justify-self: center;
+    width: fit-content;
+    padding: .3rem;
+    background-color: #fff;
+    border-radius: 1rem;
+  }
+}
+
+.back-dark h2 {
+  color: #fff !important;
+}
+
+.elementor-element-4be972c,
+.elementor-element-a0995ce,
+.elementor-element-0e0a507,
+.elementor-element-201fc7f,
+.elementor-element-79cf92d,
+.elementor-element-327389c7,
+.elementor-element-2e4776a6 {
+  background-color: transparent !important;
+  background-image: linear-gradient(61deg, var(--e-global-color-775f678) 42%, #799CFF8C 100%) !important;
+}
+
+.back-dark {
+  background-color: #000 !important;
+  background-image: none !important;
+}
+.elementor-142 .elementor-element.elementor-element-2ecb6138,
+.elementor-142 .elementor-element.elementor-element-2d800aee{
+  width: fit-content !important;
+  flex: 0 0 auto;
+}
+
+#menu-1-198384a3{
+  justify-content: flex-end;
+}
+
+.hfe-nav-menu__align-justify .hfe-nav-menu__layout-horizontal .hfe-nav-menu li.menu-item{
+  flex-grow: inherit !important;
+}
+
+#menu-1-198384a3 li a{
+  padding: 0 .6rem !important;
+}
+
+.elementor-element-24dddc35 .e-con-inner{ 
+  padding: 3rem 0 0;
+}
+
+.img_flex img{
+  flex: 0 0 auto;
+}
+
+.wp-page{
+  overflow: hidden;
+}
+html {
+    scroll-behavior: smooth;
+}
+
+@media (max-width: 767px) {
+    .mobile-fixed-button {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        z-index: 9999;
+        background: transparent;
+        padding: 10px 15px;
+        box-sizing: border-box;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        pointer-events: none;
+    }
+
+    .mobile-fixed-button .mobile-fixed-button-link {
+        flex: 1;
+        display: block;
+        background: #8E36E6;
+        color: #ffffff;
+        text-align: center;
+        padding: 16px 0;
+        border-radius: 60px;
+        font-size: 18px;
+        font-weight: bold;
+        text-decoration: none;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+        border: none;
+        pointer-events: auto;
+        transition: background 0.2s;
+    }
+
+    .mobile-fixed-button .mobile-fixed-button-link:hover {
+        background: #8E36E6;
+    }
+
+    .mobile-fixed-button .mobile-scroll-top {
+        width: 56px;
+        height: 56px;
+        background: #8E36E6;
+        color: #ffffff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        font-size: 28px;
+        font-weight: bold;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+        pointer-events: auto;
+        transition: background 0.2s;
+        flex-shrink: 0; 
+    }
+
+    .mobile-fixed-button .mobile-scroll-top:hover {
+        background: #8E36E6;
+    }
+
+    body {
+        padding-bottom: 100px;
+    }
+}
+
+@media (min-width: 768px) {
+    .mobile-fixed-button {
+        display: none;
+    }
+}
+.auto-faq {
+    width: 100%;                /* занимает всю доступную ширину родителя */
+    max-width: 100%;            /* не позволяет выходить за пределы */
+    box-sizing: border-box;     /* паддинги не увеличивают общую ширину */
+    padding: 15px;              /* отступы внутри блока (подберите под дизайн) */
+    overflow-wrap: break-word;  /* перенос длинных слов */
+    word-wrap: break-word;      /* для старых браузеров */
+    hyphens: auto;              /* (опционально) перенос с дефисами */
+}
+
+.auto-faq p {
+    margin: 10px 0 0;           /* отступы для параграфов */
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
+/* Если нужен максимальный размер на очень широких экранах */
+@media (min-width: 1200px) {
+    .auto-faq {
+        max-width: 800px;       /* ограничиваем ширину на десктопе */
+        margin-left: auto;      /* центрируем, если нужно */
+        margin-right: auto;
+    }
+}
+.mobile-fixed-button {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .mobile-fixed-button {
+        display: flex;  /* или display: block + остальные свойства */
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        /* остальные стили остаются как у вас */
+    }
+}
+
+/* Центрируем кнопку Jetzt Spielen только на мобильных */
+@media (max-width: 767px) {
+    .elementor-element-745c7aae .elementor-button-wrapper {
+        display: flex;
+        justify-content: center;
+    }
+}
+@media (max-width: 767px) {
+    /* 1. Центрируем дочерние элементы в главном родителе */
+    .elementor-element-48eb6136 {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+    }
+
+    /* 2. Настраиваем блок, в котором лежит логотип */
+    .elementor-element-38d745aa {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important; /* Центрирует содержимое внутри флекса */
+        margin-top: 20px !important; /* Добавим отступ сверху, чтобы не слипалось с текстом */
+    }
+
+    /* 3. Фикс для самой картинки внутри виджета */
+    .elementor-element-38d745aa .elementor-widget-image {
+        text-align: center !important;
+    }
+
+    .elementor-element-38d745aa img {
+        margin: 0 auto !important;
+        display: inline-block !important;
+    }
+}
+/* Убираем flex-разделение, делаем картинку на всю ширину */
+.elementor-element-5b109665 {
+    flex-direction: column !important;
+    align-items: center !important;
+}
+
+.elementor-element-6e7af123 {
+    width: 100% !important;
+    justify-content: center !important;
+}
+
+.elementor-element-4321eed0 {
+    display: none !important; /* скрываем пустой блок */
+}
+
+.elementor-element-695fc29 img {
+    display: block !important;
+    margin: 0 auto !important;
+}
+.img_flex {
+    display: flex;
+    flex-direction: column; /* Esto apila los elementos verticalmente */
+    align-items: center;    /* Opcional: centra el texto y la imagen */
+}
+/* Изменение размера логотипа */
+.elementor-element-4bea36fb img {
+    width: 200px !important; /* Укажите нужную ширину */
+    height: auto !important;
+}
+/* Стилизация кнопок под блоками H2, чтобы они соответствовали главной кнопке */
+.elementor-widget-button {
+    display: flex !important;
+    justify-content: center !important; /* Центрируем кнопку на странице */
+    width: 100% !important;
+}
+
+.elementor-widget-button .elementor-button {
+    padding: 15px 40px !important; /* Делаем кнопку больше (высота и ширина) */
+    font-size: 18px !important;    /* Увеличиваем размер текста */
+    border-radius: 50px !important; /* Делаем кнопку круглой (как под H1) */
+    transition: all 0.3s ease !important;
+}
+
+/* Эффект при наведении (опционально, для плавности) */
+.elementor-widget-button .elementor-button:hover {
+    transform: scale(1.05); /* Легкое увеличение при наведении */
+}
+
+/* Разрешаем дочерним элементам img_flex сжиматься меньше их контента */
+.img_flex > div {
+  min-width: 0;
+  width: 100%;
+}
+@media (max-width: 767px) {
+  .auto-content-wrapper table,
+  .elementor-widget-text-editor table {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .auto-content-wrapper th, 
+  .auto-content-wrapper td,
+  .elementor-widget-text-editor th, 
+  .elementor-widget-text-editor td {
+    white-space: nowrap !important; 
+  }
+  
+  .auto-content-wrapper {
+    max-width: 100% !important;
+  }
+}

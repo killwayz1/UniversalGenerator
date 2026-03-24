@@ -1,0 +1,58 @@
+.footer-width-fixer {
+    width: 100%;
+}
+
+/* Container fix for genesis themes */
+
+.ehf-template-genesis.ehf-header .site-header .wrap,
+.ehf-template-genesis.ehf-footer .site-footer .wrap,
+.ehf-template-generatepress.ehf-header .site-header .inside-header {
+    width: 100%;
+    padding: 0;
+    max-width: 100%;
+}
+
+/* Container fix for generatepress theme */
+
+.ehf-template-generatepress.ehf-header .site-header,
+.ehf-template-generatepress.ehf-footer .site-footer {
+    width: 100%;
+    padding: 0;
+    max-width: 100%;
+    background-color: transparent !important;
+    /* override generatepress default white color for header */
+}
+
+.bhf-hidden {
+    display: none
+}
+
+/* Fix: Header hidden below the page content */
+.ehf-header #masthead {
+    z-index: 99;
+    position: relative;
+}
+
+.hfe-nav-menu__layout-horizontal.menu-is-active ul.hfe-nav-menu {
+    min-width: 12rem;
+    top: 1rem;
+    left: inherit;
+    right: 0;
+}
+
+
+.elementor-158 .elementor-element.elementor-element-8f3cb1f {
+    align-items: center;
+    justify-content: flex-end;
+}
+
+@media only screen and (max-width: 1024px) {
+
+    .hfe-nav-menu__layout-horizontal.menu-is-active ul.hfe-nav-menu a {
+        color: #000 !important;
+    }
+}
+.elementor-61 .elementor-element.elementor-element-221972d5:not(.elementor-motion-effects-element-type-background), .elementor-61 .elementor-element.elementor-element-221972d5 > .elementor-motion-effects-container > .elementor-motion-effects-layer,
+.elementor-61 .elementor-element.elementor-element-5fc066d8:not(.elementor-motion-effects-element-type-background), .elementor-61 .elementor-element.elementor-element-5fc066d8 > .elementor-motion-effects-container > .elementor-motion-effects-layer{
+    display: none;
+}

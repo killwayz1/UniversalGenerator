@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Генератор Шаблонов Казино</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+  <div class="container" style="max-width: 800px;">
+    <h1>🚀 Сборка нового сайта</h1>
+
+    <form action="/generate" method="POST" id="generateForm">
+      <div class="input-group">
+        <label for="template_name">Выберите шаблон дизайна:</label>
+        <select name="template_name" id="template_name" required>
+          <option value="" disabled selected>-- Выберите шаблон --</option>
+          {% for template in templates %}
+          <option value="{{ template }}">{{ template }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label for="domain">Домен сайта (например, site.com):</label>
+        <input type="text" name="domain" id="domain" placeholder="bookofaztec.org" required>
+      </div>
+
+      <div class="input-group">
+        <label for="site_name">Название сайта:</label>
+        <input type="text" name="site_name" id="site_name" placeholder="Book of Aztec" required>
+      </div>
+
+      <div class="input-group">
+        <label for="aff_url">Партнерская ссылка (Aff URL):</label>
+        <input type="url" name="aff_url" id="aff_url" placeholder="https://..." required>
+      </div>
+
+      <div class="input-group">
+        <label for="tz_url">Ссылка на Главное ТЗ (Google Sheet):</label>
+        <input type="url" name="tz_url" id="tz_url" placeholder="https://docs.google.com/spreadsheets/d/..." required>
+      </div>
+
+      <div id="palette_container" class="input-group" style="display: none; background: #f8fafc; padding: 16px; border-radius: 8px; border: 1px dashed #cbd5e1; margin-bottom: 20px;">
+        <label style="font-size: 15px; font-weight: bold; margin-bottom: 6px; color: #0f172a;">🎨 Глобальная палитра Elementor:</label>
+        <p style="font-size: 12px; color: #64748b; margin-top: 0; margin-bottom: 16px;">
+          Найдены все цвета из глобальных настроек (включая прозрачные). Выберите новые цвета, а если менять не нужно — оставьте поле пустым.
+        </p>
+        
+        <div id="palette_grid" style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;"></div>
+
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center;">
+                <input type="checkbox" name="uniq_files" id="uniq_files" value="yes" checked style="width: 18px; height: 18px; margin-right: 10px; cursor: pointer;">
+                <label for="uniq_files" style="margin: 0; font-weight: normal; cursor: pointer; font-size: 14px; color: #0f172a;">Рандомизировать названия файлов (Скрыть следы шаблона Elementor)</label>
+            </div>
+            
+            <div style="display: flex; align-items: center;">
+                <input type="checkbox" name="uniq_shift" id="uniq_shift" value="yes" checked style="width: 18px; height: 18px; margin-right: 10px; cursor: pointer;">
+                <label for="uniq_shift" style="margin: 0; font-weight: normal; cursor: pointer; font-size: 14px; color: #0f172a;">Сдвинуть сайт и картинки на 1px (Сброс пиксельной идентичности)</label>
+            </div>
+        </div>
+      </div>
+
+      <button type="submit" id="submitBtn">Сгенерировать сайт</button>
+    </form>
+
+    <div id="resultBox"></div>
+  </div>
+
+  <script src="/static/script.js"></script>
+  
+  <script>
+    document.getElementById('template_name').addEventListener('change', async function() {
+        const templateName = this.value;
+        const container = document.getElementById('palette_container');
+        const grid = document.getElementById('palette_grid');
+        
+        container.style.display = 'block';
+        grid.innerHTML = '<div style="font-size: 14px; color: #64748b;">⏳ Сканирую все CSS файлы на переменные --e-global...</div>';
+
+        try {
+            const response = await fetch('/analyze_colors', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ template_name: templateName })
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                grid.innerHTML = '';
+                
+                if (data.colors.length === 0) {
+                    grid.innerHTML = '<div style="font-size: 14px; color: #64748b;">Глобальные цвета не найдены.</div>';
+                    return;
+                }
+
+                data.colors.forEach(color => {
+                    const pickerColor = color.length > 7 ? color.substring(0, 7) : color;
+                    
+                    const div = document.createElement('div');
+                    div.style.display = 'flex';
+                    div.style.alignItems = 'center';
+                    div.style.gap = '6px';
+                    div.style.background = '#ffffff';
+                    div.style.padding = '6px 10px';
+                    div.style.borderRadius = '6px';
+                    div.style.border = '1px solid #e2e8f0';
+                    div.style.width = 'calc(50% - 5px)';
+                    div.style.boxSizing = 'border-box';
+
+                    div.innerHTML = `
+                        <div style="width: 18px; height: 18px; background-color: ${color}; border: 1px solid #cbd5e1; border-radius: 4px; flex-shrink: 0;" title="Старый цвет: ${color}"></div>
+                        <span style="font-size: 11px; font-family: monospace; color: #475569; width: 62px;">${color}</span>
+                        <span style="color: #94a3b8; font-size: 11px;">➔</span>
+                        
+                        <input type="color" value="${pickerColor}" 
+                            onchange="this.nextElementSibling.value = this.value; this.nextElementSibling.style.borderColor = '#3b82f6';" 
+                            style="width: 24px; height: 24px; padding: 0; border: none; cursor: pointer; flex-shrink: 0;">
+                        
+                        <input type="text" name="new_colors[]" placeholder="Без изм." 
+                            style="width: 75px; padding: 4px; font-size: 12px; border: 1px solid #e2e8f0; border-radius: 4px;">
+                        
+                        <input type="hidden" name="old_colors[]" value="${color}">
+                    `;
+                    grid.appendChild(div);
+                });
+            } else {
+                grid.innerHTML = `<div style="color: #ef4444; font-size: 14px;">❌ Ошибка: ${data.message}</div>`;
+            }
+        } catch (error) {
+            grid.innerHTML = '<div style="color: #ef4444; font-size: 14px;">❌ Ошибка соединения с сервером.</div>';
+        }
+    });
+  </script>
+</body>
+</html>

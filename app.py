@@ -1883,13 +1883,47 @@ def _smart_inject_html_kross(file_path, json_data, page_slug, is_policy=False):
         # Фолбэк: ищем H2-теги в main и заменяем их
         main_content_node = soup.find('main', class_='container') or soup.body
         tags_raw = main_content_node.find_all(['h2'])
-        doc_article_idx = 0
-
+        
+        # 1. Отфильтруем заголовки сайдбара и виджетов, чтобы не вставлять статьи туда
+        valid_h2s = []
         for elem in tags_raw:
             if not elem.parent: continue
             h2_text = elem.get_text(strip=True).lower()
+            if any(word in h2_text for word in ['top ', 'ranking', 'lista ', 'list of ', 'best ', 'najlepsz', 'popular', 'recent', 'related', 'podobne']):
+                continue
+            if 'casino' in h2_text and any(w in h2_text for w in ['play', 'graj', 'where']):
+                continue
+            valid_h2s.append(elem)
 
+        doc_article_idx = 0
+        last_article_element = None
+
+        for elem in valid_h2s:
+            h2_text = elem.get_text(strip=True).lower()
+
+            # --- ОБРАБОТКА FAQ В ШАБЛОНЕ ---
             if any(word in h2_text for word in ['faq', 'pytania', 'preguntas', 'вопрос']):
+                # ВАЖНО: Если дошли до FAQ, выгружаем все ОСТАВШИЕСЯ статьи строго ПЕРЕД ним
+                while doc_article_idx < len(article_sections):
+                    sec = article_sections[doc_article_idx]
+                    new_card = soup.new_tag('article', attrs={'class': 'modern-card mb-4'})
+                    icon = soup.new_tag('i', attrs={'class': 'bi bi-journal-text modern-card-icon'})
+                    new_card.append(icon)
+                    new_h2 = soup.new_tag('h2')
+                    new_h2.string = sec['title']
+                    new_card.append(new_h2)
+                    wrapper = soup.new_tag('div', attrs={'class': 'auto-content-wrapper'})
+                    wrapper.append(BeautifulSoup(sec['content'], 'html.parser'))
+                    new_card.append(wrapper)
+
+                    parent_card = elem.find_parent('article', class_='modern-card')
+                    if parent_card:
+                        parent_card.insert_before(new_card)
+                    else:
+                        elem.insert_before(new_card)
+                    doc_article_idx += 1
+
+                # Теперь рендерим сам FAQ
                 if faq_sections:
                     sec = faq_sections.pop(0)
                     next_sib = elem.find_next_sibling()
@@ -1900,16 +1934,19 @@ def _smart_inject_html_kross(file_path, json_data, page_slug, is_policy=False):
                     faq_div = soup.new_tag('div', attrs={'class': 'accordion mb-4', 'id': 'accordionFAQ'})
                     faq_div.append(BeautifulSoup(_wrap_faq_content_kross(sec['content']), 'html.parser'))
                     elem.insert_after(faq_div)
+                    last_article_element = faq_div
                 else:
                     parent_card = elem.find_parent('article', class_='modern-card')
                     if parent_card: parent_card.decompose()
                     else: elem.decompose()
                 continue
 
+            # --- ОБРАБОТКА ОБЫЧНЫХ СТАТЕЙ ---
             if doc_article_idx < len(article_sections):
                 sec = article_sections[doc_article_idx]
                 parent_card = elem.find_parent('article', class_='modern-card')
                 content_block = soup.new_tag('div')
+
                 if not is_policy and doc_article_idx < 3:
                     row = soup.new_tag('div', attrs={'class': 'row align-items-center mb-4'})
                     col_text = soup.new_tag('div', attrs={'class': 'col-lg-7 col-md-12'})
@@ -1950,7 +1987,7 @@ def _smart_inject_html_kross(file_path, json_data, page_slug, is_policy=False):
                     new_h2.string = sec['title']
                     content_block.append(new_h2)
                     wrapper = soup.new_tag('div', attrs={'class': 'auto-content-wrapper'})
-                    wrapper.append(BeautifulSoup(sec['content'], 'lxml'))
+                    wrapper.append(BeautifulSoup(sec['content'], 'html.parser'))
                     content_block.append(wrapper)
 
                 if parent_card:
@@ -1958,17 +1995,58 @@ def _smart_inject_html_kross(file_path, json_data, page_slug, is_policy=False):
                     icon = soup.new_tag('i', attrs={'class': 'bi bi-journal-text modern-card-icon'})
                     parent_card.append(icon)
                     for child in list(content_block.children): parent_card.append(child)
+                    last_article_element = parent_card
                 else:
                     new_card = soup.new_tag('article', attrs={'class': 'modern-card mb-4'})
                     icon = soup.new_tag('i', attrs={'class': 'bi bi-journal-text modern-card-icon'})
                     new_card.append(icon)
                     for child in list(content_block.children): new_card.append(child)
                     elem.replace_with(new_card)
+                    last_article_element = new_card
                 doc_article_idx += 1
             else:
                 parent_card = elem.find_parent('article', class_='modern-card')
                 if parent_card: parent_card.decompose()
                 else: elem.decompose()
+
+        # --- ДОБИВАЕМ ОСТАТКИ, ЕСЛИ В ШАБЛОНЕ БОЛЬШЕ НЕТ H2 ---
+        append_target = main_content_node
+        if last_article_element and last_article_element.parent:
+            append_target = last_article_element.parent
+
+        # 1. Если остались обычные статьи (шаблон кончился до FAQ)
+        while doc_article_idx < len(article_sections):
+            sec = article_sections[doc_article_idx]
+            new_card = soup.new_tag('article', attrs={'class': 'modern-card mb-4'})
+            icon = soup.new_tag('i', attrs={'class': 'bi bi-journal-text modern-card-icon'})
+            new_card.append(icon)
+            new_h2 = soup.new_tag('h2')
+            new_h2.string = sec['title']
+            new_card.append(new_h2)
+            wrapper = soup.new_tag('div', attrs={'class': 'auto-content-wrapper'})
+            wrapper.append(BeautifulSoup(sec['content'], 'html.parser'))
+            new_card.append(wrapper)
+
+            if last_article_element:
+                last_article_element.insert_after(new_card)
+            else:
+                append_target.append(new_card)
+            last_article_element = new_card
+            doc_article_idx += 1
+
+        # 2. Если остался FAQ, а в шаблоне не было слота под FAQ
+        for sec in faq_sections:
+            faq_div = soup.new_tag('div', attrs={'class': 'accordion mb-4', 'id': 'accordionFAQ'})
+            faq_h2 = soup.new_tag('h2', attrs={'class': 'text-center mb-4'})
+            faq_h2.string = sec['title']
+            faq_div.append(faq_h2)
+            faq_div.append(BeautifulSoup(_wrap_faq_content_kross(sec['content']), 'html.parser'))
+            
+            if last_article_element:
+                last_article_element.insert_after(faq_div)
+            else:
+                append_target.append(faq_div)
+            last_article_element = faq_div
 
     if is_faq_only:
         hero = soup.find('section', class_='hero-section')

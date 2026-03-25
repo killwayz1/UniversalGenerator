@@ -1247,6 +1247,141 @@
     <a href="{{AFF_URL}}" class="mobile-fixed-button-link">Play Now</a>
     <a href="#" class="mobile-scroll-top" aria-label="Наверх">▴</a>
 </div>
+    <script>
+document.addEventListener("DOMContentLoaded", () => {
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+
+    function initCarousel(selectors) {
+        const scrollContainers = document.querySelectorAll(selectors);
+
+        scrollContainers.forEach(container => {
+            // Считаем количество оригинальных элементов до клонирования
+            const originalCount = container.children.length;
+            if (originalCount === 0) return;
+
+            const originalContent = container.innerHTML;
+            
+            // Вставляем 3 копии контента подряд. 
+            // Это создает огромный буфер, чтобы скролл физически никогда не заканчивался до телепорта.
+            container.innerHTML += originalContent + originalContent + originalContent;
+
+            let isScrolling = true;
+            let scrollSpeed = 0.4; // Скорость прокрутки
+            let exactScrollLeft = 0; 
+            let teleportPoint = 0;
+            
+            // Переменные для перетаскивания мыши
+            let isDown = false;
+            let isDragging = false;
+            let startX;
+            let dragScrollStart;
+
+            function updateTeleportPoint() {
+                // Точная точка телепортации: расстояние от начала первого оригинала до начала первой копии
+                if (container.children[originalCount]) {
+                    teleportPoint = container.children[originalCount].offsetLeft - container.children[0].offsetLeft;
+                }
+            }
+
+            updateTeleportPoint();
+            // Пересчитываем точку на случай, если картинки догрузились с задержкой
+            window.addEventListener('load', updateTeleportPoint);
+            window.addEventListener('resize', updateTeleportPoint);
+
+            function autoScroll() {
+                if (teleportPoint > 0) {
+                    // Телепорт при прокрутке вперед
+                    if (container.scrollLeft >= teleportPoint) {
+                        container.scrollLeft -= teleportPoint;
+                        exactScrollLeft -= teleportPoint;
+                        if (isDown) dragScrollStart -= teleportPoint; // Корректируем захват мыши
+                    } 
+                    // Телепорт при ручной прокрутке назад за начало
+                    else if (container.scrollLeft <= 0 && isDown) {
+                        container.scrollLeft += teleportPoint;
+                        exactScrollLeft += teleportPoint;
+                        if (isDown) dragScrollStart += teleportPoint;
+                    }
+                }
+
+                // Логика движения
+                if (isScrolling && !isDown) {
+                    exactScrollLeft += scrollSpeed;
+                    container.scrollLeft = Math.floor(exactScrollLeft);
+                } else {
+                    // Синхронизация при ручном управлении
+                    exactScrollLeft = container.scrollLeft;
+                }
+
+                requestAnimationFrame(autoScroll);
+            }
+
+            requestAnimationFrame(autoScroll);
+
+            // === УПРАВЛЕНИЕ КАСАНИЕМ (Мобильные) ===
+            container.addEventListener('touchstart', () => {
+                isScrolling = false;
+            }, { passive: true });
+
+            container.addEventListener('touchend', () => {
+                setTimeout(() => { isScrolling = true; }, 1000);
+            }, { passive: true });
+
+            // === УПРАВЛЕНИЕ МЫШЬЮ (ПК) ===
+            container.style.cursor = 'grab';
+
+            container.addEventListener('mousedown', (e) => {
+                isDown = true;
+                isDragging = false; 
+                container.style.cursor = 'grabbing';
+                startX = e.pageX - container.offsetLeft;
+                dragScrollStart = container.scrollLeft;
+            });
+
+            container.addEventListener('mouseleave', () => {
+                isDown = false;
+                container.style.cursor = 'grab';
+            });
+
+            container.addEventListener('mouseup', () => {
+                isDown = false;
+                container.style.cursor = 'grab';
+            });
+
+            container.addEventListener('mousemove', (e) => {
+                if (!isDown) return;
+                
+                const x = e.pageX - container.offsetLeft;
+                const walk = (x - startX);
+                
+                // Перетаскивание засчитывается только если курсор сместился больше чем на 5px
+                if (Math.abs(walk) > 5) {
+                    isDragging = true;
+                    e.preventDefault();
+                    container.scrollLeft = dragScrollStart - walk;
+                    exactScrollLeft = container.scrollLeft;
+                }
+            });
+
+            // Блокировка случайных кликов по ссылкам во время перетаскивания
+            container.addEventListener('click', (e) => {
+                if (isDragging) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }, { capture: true });
+        });
+    }
+
+    // 1. Провайдеры крутятся везде (ПК + Мобильные)
+    initCarousel('.providers-list');
+
+    // 2. Игры крутятся только на мобильных
+    if (isMobile) {
+        initCarousel('.games-list, .games-list-v2');
+    }
+});
+</script>
 </body>
 
 </html>

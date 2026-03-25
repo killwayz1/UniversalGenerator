@@ -4940,3 +4940,70 @@ html {
     flex-direction: column;
     justify-content: space-between;
 }
+/* =========================================
+   ГЛОБАЛЬНЫЕ СТИЛИ (ПК + МОБИЛЬНЫЕ)
+   Для списка провайдеров
+========================================= */
+.providers-list {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Скрываем скроллбар в Firefox */
+    gap: 20px;
+    padding-bottom: 10px;
+}
+
+/* Скрываем скроллбар в Chrome/Safari/Edge */
+.providers-list::-webkit-scrollbar {
+    display: none;
+}
+
+.providers-list__item {
+    width: 150px; /* Фиксируем размер провайдеров, как у их оригинальных картинок */
+    flex: 0 0 auto;
+}
+
+.providers-list__item img {
+    width: 100%;
+    height: auto;
+}
+
+/* =========================================
+   МОБИЛЬНЫЕ СТИЛИ (ТОЛЬКО ДО 768px)
+   Для списков игр
+========================================= */
+@media (max-width: 768px) {
+    .games-list, 
+    .games-list-v2 {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 15px; 
+        padding-bottom: 10px;
+    }
+
+    .games-list::-webkit-scrollbar,
+    .games-list-v2::-webkit-scrollbar {
+        display: none;
+    }
+
+    .games-list__item, 
+    .games-list-v2__item {
+        width: 200px; /* Твой размер для мобилок */
+        flex: 0 0 auto; 
+    }
+
+    .games-list__item img, 
+    .games-list-v2__item img {
+        width: 100%;
+        height: auto;
+    }
+}
+h2 {
+    font-size: 1.75rem !important; 
+    font-weight: bold !important;
+    margin-bottom: 1rem !important;
+}

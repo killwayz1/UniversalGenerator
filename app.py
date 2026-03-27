@@ -2623,7 +2623,9 @@ def _smart_inject_html_sushi2(file_path, json_data, site_name=None):
     path_lower = file_path.lower()
     is_policy_page = any(kw in path_lower for kw in [
         'policy', 'terms', 'conditions', 'privacy', 'rules', 'cookie', 'responsible',
-        'richtlinie', 'datenschutz', 'verantwortung', 'nutzungsbedingungen'
+        'richtlinie', 'datenschutz', 'verantwortung', 'nutzungsbedingungen',
+        'agb', 'allgemeine', 'impressum', 'disclaimer', 'legal', 'regulamin', 
+        'prywatnosci', 'condiciones', 'privacidad', 'terminos'
     ])
     is_faq_only_page = any(kw in path_lower for kw in [
         'ai-questions', 'ai_questions', 'faq', 'questions', 'вопросы'
@@ -2633,13 +2635,41 @@ def _smart_inject_html_sushi2(file_path, json_data, site_name=None):
     # СЕРВИСНАЯ СТРАНИЦА (policy.html)
     # ============================================================
     if is_policy_page:
+        main_wrapper = soup.find('div', class_='n0dc0f73')
+        if not main_wrapper:
+            main_wrapper = soup.find('main')
+
         policy_div = soup.find('div', class_='policy')
+        
+        # 1. Если div.policy нет в шаблоне, динамически создаем его, чтобы текст не обрезался
+        if not policy_div:
+            intro_sec = soup.find('section', id='intro')
+            if intro_sec:
+                intro_sec.clear()
+                policy_div = soup.new_tag('div', class_='policy')
+                intro_sec.append(policy_div)
+            elif main_wrapper:
+                new_sec = soup.new_tag('section')
+                policy_div = soup.new_tag('div', class_='policy')
+                new_sec.append(policy_div)
+                main_wrapper.insert(0, new_sec)
+
+        # 2. Очищаем ВЕСЬ лишний контент из шаблона (чтобы старые секции не попали на сайт)
+        if main_wrapper and policy_div:
+            policy_parent_sec = policy_div.find_parent('section')
+            # Проходимся по всем section внутри main_wrapper и удаляем те, где нет нашей политики
+            for sec in list(main_wrapper.find_all('section', recursive=False)):
+                if sec != policy_parent_sec:
+                    sec.decompose()
+
+        # 3. Заполняем политику всем контентом из ТЗ
         if policy_div:
             policy_div.clear()
             if json_data.get('h1'):
                 h1 = soup.new_tag('h1')
                 h1.string = json_data['h1']
                 policy_div.append(h1)
+            
             if 'main_text' in json_data.get('sections', {}):
                 mt = json_data['sections']['main_text']['content'].strip()
                 if mt:
@@ -2658,14 +2688,24 @@ def _smart_inject_html_sushi2(file_path, json_data, site_name=None):
             for k, v in json_data.get('sections', {}).items():
                 if k == 'main_text':
                     continue
-                if any(w in k.lower() for w in faq_keywords):
+                
+                # Используем регулярные выражения \b для поиска точного слова, а не подстроки
+                is_faq = False
+                for w in faq_keywords:
+                    if re.search(rf'\b{re.escape(w)}\b', k.lower(), re.UNICODE):
+                        is_faq = True
+                        break
+                
+                if is_faq:
                     continue
+                    
                 if v.get('title'):
                     h2 = soup.new_tag('h2')
                     h2.string = v['title']
                     policy_div.append(h2)
                 if v.get('content'):
                     policy_div.append(BeautifulSoup(v['content'], 'html.parser'))
+
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(str(soup))
         return
@@ -2773,6 +2813,10 @@ def _smart_inject_html_sushi2(file_path, json_data, site_name=None):
     article_sections = []
     faq_sections = []
     
+    # ---- Разбираем секции ----
+    article_sections = []
+    faq_sections = []
+    
     faq_keywords = [
         'faq', 'вопрос', 'pytania', 'frequent', 
         'häufig', 'gestellte', 'fragen', 
@@ -2786,7 +2830,15 @@ def _smart_inject_html_sushi2(file_path, json_data, site_name=None):
     for k, v in json_data.get('sections', {}).items():
         if k == 'main_text':
             continue
-        if any(w in k.lower() for w in faq_keywords):
+            
+        # Защита от срабатывания на частях слов (например "Datenschutzanfragen")
+        is_faq = False
+        for w in faq_keywords:
+            if re.search(rf'\b{re.escape(w)}\b', k.lower(), re.UNICODE):
+                is_faq = True
+                break
+                
+        if is_faq:
             faq_sections.append(v)
         else:
             article_sections.append(v)
@@ -3096,7 +3148,9 @@ def _process_pages_sushi2(tz_df, dst_site_dir, site_name):
         # ---- Определяем целевой файл ----
         is_service = any(kw in page_slug for kw in [
             'policy', 'privacy', 'terms', 'cookie', 'responsible',
-            'richtlinie', 'datenschutz', 'cookies', 'rules'
+            'richtlinie', 'datenschutz', 'cookies', 'rules', 'nutzungsbedingungen',
+            'agb', 'allgemeine', 'impressum', 'disclaimer', 'legal', 'regulamin', 
+            'prywatnosci', 'condiciones', 'privacidad', 'terminos'
         ])
 
         # ---- Скачиваем картинки (строго max 3, пропускаем для сервисных страниц) ----

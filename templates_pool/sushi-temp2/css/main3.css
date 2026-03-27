@@ -2818,7 +2818,7 @@ table:not(:has(thead)) tr:first-child td {
   padding: 16px;
   border-radius: 2rem;
   color: #fff;
-  background: rgb(55,16,18);
+  background: rgb(55, 16, 18);
   margin-bottom: 16px;
 }
 
@@ -2904,8 +2904,13 @@ section>h1 {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 #go-top-elem {
@@ -2979,7 +2984,7 @@ section>h1 {
   background: rgba(255, 255, 255, 0.193);
   margin-bottom: 15px;
   border-radius: 12px;
-  border: 1px solid ;
+  border: 1px solid;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   border-color: #ffba00;
@@ -3015,7 +3020,7 @@ section>h1 {
 }
 
 [data-item="faq-item"].active {
-  
+
   background: rgba(255, 186, 0, 0.05);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
@@ -3133,8 +3138,15 @@ section>h1 {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 
@@ -3169,9 +3181,17 @@ section>h1 {
 }
 
 @keyframes spin-casino {
-  0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(180deg) scale(1.2); }
-  100% { transform: rotate(360deg) scale(1); }
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  50% {
+    transform: rotate(180deg) scale(1.2);
+  }
+
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
 }
 
 .h06ecd {
@@ -3180,7 +3200,7 @@ section>h1 {
   backdrop-filter: blur(10px);
   padding: 25px;
   border-radius: 24px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
 }
 
 .h06ecd .x30f2c {
@@ -3194,6 +3214,7 @@ section>h1 {
   column-gap: 10px;
   grid-template-columns: repeat(2, 1fr);
 }
+
 .h06ecd .dd912b9 a {
   background: rgba(255, 255, 255, 0.02);
   padding: 12px 15px;
@@ -3272,7 +3293,7 @@ body[data-menu-open] {
   background: #1a1a1a;
   padding: 20px;
   position: relative;
-  box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
 }
@@ -3336,7 +3357,7 @@ body[data-menu-open] {
   }
 }
 
-.h06ecd{
+.h06ecd {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3344,39 +3365,44 @@ body[data-menu-open] {
   gap: 10px;
 }
 
-h1{
+h1 {
   font-size: 2rem;
   font-weight: bold;
   margin-bottom: 20px;
 }
 
-h2{
+h2 {
   font-size: 1.7rem;
 }
 
-h2{
+h2 {
   font-size: 1.4rem;
 }
 
-.hero__content{
+.hero__content {
   margin-bottom: 15px;
 }
 
-main{
+main {
   overflow: hidden;
 }
 
-.table{
+.table {
   overflow-x: auto;
 }
+
 .policy h3,
-.policy h2{
+.policy h2 {
   margin: 20px 0 10px;
 }
-.b19fbc {
-  max-width: 700px;  /* Максимальная ширина логотипа на сайте */
-  max-height: 700px; /* Максимальная высота логотипа */
-  width: auto;       /* Позволяет ширине подстраиваться */
-  height: auto;      /* Позволяет высоте подстраиваться (сохраняет пропорции) */
-  display: block;    /* Убирает лишний отступ снизу, который бывает у картинок */
+/* --- Исправление пропорций для баннеров и логотипа --- */
+.w7d52ae61 .o2118d2 picture img.b19fbc {
+    width: 100%;
+    max-width: 100%;
+    height: auto !important; /* Перебиваем жесткие высоты из старых медиа-запросов */
+    max-height: 450px;       /* Ограничиваем высоту, чтобы картинка не занимала весь экран */
+    aspect-ratio: auto;      /* Отключаем жесткую пропорцию 1200/400 */
+    object-fit: contain;     /* Картинка помещается целиком без обрезки */
+    display: block;
+    margin: 0 auto;          /* Центрируем картинку, если она меньше ширины блока */
 }

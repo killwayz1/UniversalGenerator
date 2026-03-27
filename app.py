@@ -1641,7 +1641,7 @@ def _smart_inject_html_sushi(file_path, json_data, site_name=None):
     if not is_faq_only_page:
         if seo_content:
             if article_html.strip():
-                seo_content.append(BeautifulSoup(article_html, 'lxml'))
+                _bs4_safe_append(seo_content, article_html)
             else:
                 seo_section = seo_content.find_parent('section')
                 if seo_section:
@@ -1651,7 +1651,7 @@ def _smart_inject_html_sushi(file_path, json_data, site_name=None):
             if main_tag:
                 main_tag.append(BeautifulSoup(
                     f"<section class='seo-section'><div class='container'>"
-                    f"<div class='seo-content'>{article_html}</div></div></section>", 'lxml'))
+                    f"<div class='seo-content'>{article_html}</div></div></section>", 'html.parser'))
 
     # FAQ-блок
     faq_html = ""
@@ -1687,14 +1687,14 @@ def _smart_inject_html_sushi(file_path, json_data, site_name=None):
     # Финальная вставка FAQ-контента (таблицы и/или аккордеона)
     if faq_html.strip():
         if faq_container:
-            faq_container.append(BeautifulSoup(faq_html, 'lxml'))
+            _bs4_safe_append(faq_container, faq_html)
         else:
             main_tag = soup.find('main')
             if main_tag:
                 main_tag.append(BeautifulSoup(
                     f"<section id='faq' class='faq-section'>"
                     f"<div class='container auto-faq-container'>{faq_html}</div>"
-                    f"</section>", 'lxml'))
+                    f"</section>", 'html.parser'))
     else:
         # Если FAQ-контента нет — удаляем пустой контейнер
         if faq_container:
@@ -1793,7 +1793,7 @@ def _smart_inject_html_kross(file_path, json_data, page_slug, is_policy=False):
     </style>
     """
     if not soup.find('style', class_='auto-content-style') and soup.head:
-        soup.head.append(BeautifulSoup(css_styles, 'lxml'))
+        _bs4_safe_append(soup.head, css_styles)
 
     if json_data.get('seo_title'):
         if soup.title: soup.title.string = json_data['seo_title']
@@ -1908,7 +1908,7 @@ def _smart_inject_html_kross(file_path, json_data, page_slug, is_policy=False):
                 new_h2.string = sec['title']
                 new_card.append(new_h2)
                 wrapper = soup.new_tag('div', attrs={'class': 'auto-content-wrapper'})
-                wrapper.append(BeautifulSoup(sec['content'], 'lxml'))
+                _bs4_safe_append(wrapper, sec['content'])
                 new_card.append(wrapper)
             target_container.append(new_card)
             doc_article_idx += 1
@@ -2153,7 +2153,7 @@ def _smart_inject_html_slotsite(file_path, json_data, template_name=""):
     </style>
     """
     if not soup.find('style', class_='auto-content-style') and soup.head:
-        soup.head.append(BeautifulSoup(css_styles, 'lxml'))
+        _bs4_safe_append(soup.head, css_styles)
 
     if json_data.get('seo_title'):
         if soup.title: soup.title.string = json_data['seo_title']
@@ -2226,7 +2226,7 @@ def _smart_inject_html_slotsite(file_path, json_data, template_name=""):
             if json_data.get('h1'): elem.string = json_data['h1']
             if main_text:
                 wrapper = soup.new_tag('div', attrs={'class': 'auto-content-wrapper'})
-                wrapper.append(BeautifulSoup(main_text, 'lxml'))
+                _bs4_safe_append(wrapper, main_text)
                 elem.insert_after(wrapper)
                 main_text = ""
             continue
@@ -2249,7 +2249,10 @@ def _smart_inject_html_slotsite(file_path, json_data, template_name=""):
                     for s in faq_sections[1:]:
                         html += (f"<h2 style='margin-top:30px;'>{s['title']}</h2>"
                                  f"<div class='auto-faq'>{_wrap_faq_content_slotsite(s['content'])}</div>")
-                    elem.insert_after(BeautifulSoup(html, 'lxml'))
+                    parsed_faq = BeautifulSoup(html, 'html.parser')
+                    faq_nodes = list(parsed_faq.children)
+                    for node in reversed(faq_nodes):
+                        elem.insert_after(node)
                     faq_sections = []
                 else:
                     elem.decompose()
@@ -2259,7 +2262,9 @@ def _smart_inject_html_slotsite(file_path, json_data, template_name=""):
                 sec = article_sections[doc_article_idx]
                 elem.string = sec['title']
                 wrapper = soup.new_tag('div', attrs={'class': 'auto-content-wrapper'})
-                wrapper.append(BeautifulSoup(sec['content'] + play_button_html, 'lxml'))
+                parsed_fragment = BeautifulSoup(sec['content'] + play_button_html, 'html.parser')
+                for child in list(parsed_fragment.children):
+                    wrapper.append(child)
                 elem.insert_after(wrapper)
                 doc_article_idx += 1
             else:
@@ -2284,9 +2289,13 @@ def _smart_inject_html_slotsite(file_path, json_data, template_name=""):
 
     if html:
         if last_h2_element and last_h2_element.parent:
-            last_h2_element.parent.append(BeautifulSoup(html, 'lxml'))
+            parsed_tail = BeautifulSoup(html, 'html.parser')
+            for child in list(parsed_tail.children):
+                last_h2_element.parent.append(child)
         elif main_content:
-            main_content.append(BeautifulSoup(html, 'lxml'))
+            parsed_tail = BeautifulSoup(html, 'html.parser')
+            for child in list(parsed_tail.children):
+                main_content.append(child)
 
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(str(soup))

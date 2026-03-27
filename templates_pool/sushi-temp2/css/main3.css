@@ -3440,6 +3440,7 @@ html {
   scroll-behavior: smooth;
 }
 
+/* --- МОБИЛЬНАЯ ВЕРСИЯ (до 767px) --- */
 @media (max-width: 767px) {
   .mobile-fixed-button {
     position: fixed;
@@ -3499,14 +3500,16 @@ html {
     background: #e03030;
   }
 
-  /* Делаем отступ внутри футера, чтобы поднять его текст выше фиксированной кнопки */
+  /* Отступ внутри футера, чтобы поднять его текст выше фиксированной кнопки */
   footer, .zf298 {
     padding-bottom: 90px !important; 
   }
-} /* <-- Вот здесь правильно закрывается медиа-запрос для мобильных */
+} 
+/* <-- ЗАКРЫВАЕТСЯ БЛОК МОБИЛЬНОЙ ВЕРСИИ */
 
+/* --- ПК ВЕРСИЯ (от 768px и шире) --- */
 @media (min-width: 768px) {
   .mobile-fixed-button {
-    display: none;
+    display: none !important;
   }
 }

@@ -39,7 +39,7 @@ def detect_template_engine(template_dir):
         try:
             with open(engine_override, 'r', encoding='utf-8') as f:
                 engine = f.read().strip().upper()
-            if engine in ('SUSHI', 'KROSS', 'SLOTSITE'):
+            if engine in ('SUSHI', 'KROSS', 'SLOTSITE', 'SUSHI2'):
                 print(f"[ENGINE] Переопределён из _engine.txt: {engine}")
                 return engine
         except:
@@ -62,6 +62,11 @@ def detect_template_engine(template_dir):
         if 'data-elementor-type' in content or 'data-widget_type' in content:
             print("[ENGINE] Определён: SLOTSITE (Elementor)")
             return 'SLOTSITE'
+
+        # SUSHI2: обфусцированные CSS-классы этого шаблона (fe601a4c=main, n0dc0f73=wrapper, hf0d9=nav)
+        if ('fe601a4c' in content or 'n0dc0f73' in content) and 'hf0d9' in content:
+            print("[ENGINE] Определён: SUSHI2")
+            return 'SUSHI2'
 
         # Bootstrap / кастомный стиль — движок KROSS
         if ('seo-content-inject' in content
@@ -98,8 +103,7 @@ def analyze_colors():
     engine = detect_template_engine(template_dir)
     color_counts = Counter()
 
-    if engine == 'SUSHI':
-        # SUSHI: Elementor-переменные + var() fallback + любые hex; HTML/CSS/JSON; top-20
+    if engine in ('SUSHI', 'SUSHI2'):  # SUSHI/WINZ: hex + var() fallback; HTML/CSS/JSON; top-20
         pattern_elementor = re.compile(
             r'--e-global-color-[\w-]+:\s*(#[0-9a-fA-F]{3,8})(?![0-9a-fA-F])', re.IGNORECASE)
         pattern_var_fallback = re.compile(
@@ -1144,6 +1148,8 @@ def uniqualize_file_names(dst_site_dir, engine='SUSHI'):
         _uniqualize_kross(dst_site_dir)
     elif engine == 'SLOTSITE':
         _uniqualize_slotsite(dst_site_dir)
+    elif engine == 'SUSHI2':
+        _uniqualize_sushi(dst_site_dir)  # SUSHI2 использует ту же логику, что и SUSHI
     else:  # SUSHI
         _uniqualize_sushi(dst_site_dir)
 
@@ -2273,6 +2279,8 @@ def smart_inject_html(file_path, json_data, engine='SUSHI',
                                  page_slug=page_slug or '', is_policy=is_policy)
     elif engine == 'SLOTSITE':
         _smart_inject_html_slotsite(file_path, json_data, template_name=template_name)
+    elif engine == 'SUSHI2':
+        _smart_inject_html_sushi2(file_path, json_data, site_name=site_name)
     else:  # SUSHI
         _smart_inject_html_sushi(file_path, json_data, site_name=site_name)
 
@@ -2482,11 +2490,13 @@ def _inject_navigation_sushi(dst_site_dir, header_links, footer_links):
 
 
 def inject_navigation_to_all(dst_site_dir, header_links, footer_links, engine='SUSHI'):
-    """Диспетчер навигации: SUSHI — nav.main-nav, KROSS — ul#menu-header, SLOTSITE — Elementor."""
+    """Диспетчер навигации: SUSHI/SUSHI2 — nav.main-nav, KROSS — ul#menu-header, SLOTSITE — Elementor."""
     if engine == 'SLOTSITE':
         _inject_navigation_elementor(dst_site_dir, header_links, footer_links)
     elif engine == 'KROSS':
         _inject_navigation_bootstrap(dst_site_dir, header_links, footer_links)
+    elif engine == 'SUSHI2':
+        _inject_navigation_sushi2(dst_site_dir, header_links, footer_links)
     else:  # SUSHI
         _inject_navigation_sushi(dst_site_dir, header_links, footer_links)
 
@@ -2549,8 +2559,8 @@ def replace_globals(dst_site_dir, domain, site_name, aff_url,
                     for key, value in replacements.items():
                         content = content.replace(key, str(value))
 
-                    # Замена старой партнёрской ссылки (SUSHI и KROSS)
-                    if engine in ('SUSHI', 'KROSS'):
+                    # Замена старой партнёрской ссылки (SUSHI, SUSHI2 и KROSS)
+                    if engine in ('SUSHI', 'KROSS', 'SUSHI2'):
                         if old_aff_url and aff_url and old_aff_url != aff_url:
                             content = content.replace(old_aff_url, aff_url)
                         # Нормализация дефисов и HTML-энтити
@@ -2558,8 +2568,8 @@ def replace_globals(dst_site_dir, domain, site_name, aff_url,
                     else:  # SLOTSITE
                         content = content.replace("—", "-").replace("–", "-")
 
-                    # Замена старого домена (только SUSHI)
-                    if engine == 'SUSHI' and old_domain and old_domain != domain:
+                    # Замена старого домена (SUSHI и SUSHI2)
+                    if engine in ('SUSHI', 'SUSHI2') and old_domain and old_domain != domain:
                         content = content.replace(old_domain, domain)
 
                     # Замена старого бренда (все движки)
@@ -2572,6 +2582,671 @@ def replace_globals(dst_site_dir, domain, site_name, aff_url,
                 except:
                     pass
 
+
+
+# ============================================================
+# SUSHI2 — SMART_INJECT_HTML
+# ============================================================
+
+def _smart_inject_html_sushi2(file_path, json_data, site_name=None):
+    """
+    Вставляет контент в HTML-шаблон для движка SUSHI2.
+    Шаблон: main.fe601a4c > div.n0dc0f73 > section#intro + секции c H2.
+    Три банерных картинки: div.w7d52ae61 > div.o2118d2 > picture > img.b19fbc.
+    Сервисные страницы (policy/cookie/terms/…) → div.policy.
+    AI-questions / FAQ-only → удаляем intro+games, показываем таблицу/аккордеон.
+    Секция с играми (ul.la9c2) всегда сохраняется нетронутой.
+    """
+    with open(file_path, 'r', encoding='utf-8') as f:
+        soup = BeautifulSoup(f.read(), 'lxml')
+
+    # ---- SEO-теги ----
+    if json_data.get('seo_title'):
+        if soup.title:
+            soup.title.string = json_data['seo_title']
+        for tag in soup.find_all('meta', attrs={'property': re.compile(r'title', re.I)}):
+            tag['content'] = json_data['seo_title']
+        for tag in soup.find_all('meta', attrs={'name': re.compile(r'title', re.I)}):
+            tag['content'] = json_data['seo_title']
+
+    if json_data.get('meta_desc'):
+        for tag in soup.find_all('meta', attrs={'name': re.compile(r'description', re.I)}):
+            tag['content'] = json_data['meta_desc']
+        for tag in soup.find_all('meta', attrs={'property': re.compile(r'description', re.I)}):
+            tag['content'] = json_data['meta_desc']
+
+    if site_name:
+        for tag in soup.find_all('meta', attrs={'property': 'og:site_name'}):
+            tag['content'] = site_name
+
+    # ---- Тип страницы ----
+    path_lower = file_path.lower()
+    is_policy_page = any(kw in path_lower for kw in [
+        'policy', 'terms', 'conditions', 'privacy', 'rules', 'cookie', 'responsible',
+        'richtlinie', 'datenschutz', 'verantwortung', 'nutzungsbedingungen'
+    ])
+    is_faq_only_page = any(kw in path_lower for kw in [
+        'ai-questions', 'ai_questions', 'faq', 'questions', 'вопросы'
+    ])
+
+    # ============================================================
+    # СЕРВИСНАЯ СТРАНИЦА (policy.html)
+    # ============================================================
+    if is_policy_page:
+        policy_div = soup.find('div', class_='policy')
+        if policy_div:
+            policy_div.clear()
+            if json_data.get('h1'):
+                h1 = soup.new_tag('h1')
+                h1.string = json_data['h1']
+                policy_div.append(h1)
+            if 'main_text' in json_data.get('sections', {}):
+                mt = json_data['sections']['main_text']['content'].strip()
+                if mt:
+                    policy_div.append(BeautifulSoup(mt, 'html.parser'))
+            
+            faq_keywords = [
+                'faq', 'вопрос', 'pytania', 'frequent', 
+                'häufig', 'gestellte', 'fragen', 
+                'vragen', 'veelgestelde', 
+                'preguntas', 'frecuentes', 
+                'domande', 'frequenti', 
+                'ceisteanna', 'coitianta', 
+                'foire', 'questions'
+            ]
+            
+            for k, v in json_data.get('sections', {}).items():
+                if k == 'main_text':
+                    continue
+                if any(w in k.lower() for w in faq_keywords):
+                    continue
+                if v.get('title'):
+                    h2 = soup.new_tag('h2')
+                    h2.string = v['title']
+                    policy_div.append(h2)
+                if v.get('content'):
+                    policy_div.append(BeautifulSoup(v['content'], 'html.parser'))
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(str(soup))
+        return
+
+    # ============================================================
+    # FAQ-ONLY СТРАНИЦА (AI Questions / вопросы-ответы)
+    # ============================================================
+    if is_faq_only_page:
+        main_wrapper = soup.find('div', class_='n0dc0f73')
+        if not main_wrapper:
+            main_wrapper = soup.find('main')
+
+        # Удаляем intro-секцию (H1 + hero + первый баннер)
+        intro_sec = soup.find('section', id='intro')
+        if intro_sec:
+            intro_sec.decompose()
+
+        # Удаляем секции с играми (ul.la9c2) и все прочие контентные секции
+        if main_wrapper:
+            for sec in list(main_wrapper.find_all('section', recursive=False)):
+                if sec.get('id') != 'faq':
+                    sec.decompose()
+
+        # Собираем весь контент (SEO-заголовок → H1, таблицы, FAQ H3/P)
+        faq_html = ''
+        if json_data.get('h1'):
+            faq_html += f'<h1>{json_data["h1"]}</h1>\n'
+
+        if 'main_text' in json_data.get('sections', {}):
+            mt = json_data['sections']['main_text']['content'].strip()
+            if mt:
+                faq_html += mt + '\n'
+
+        for k, v in json_data.get('sections', {}).items():
+            if k == 'main_text':
+                continue
+            if v.get('title'):
+                faq_html += f'<h2>{v["title"]}</h2>\n'
+            if v.get('content'):
+                faq_html += v['content'] + '\n'
+
+        # Вставляем в section#faq или создаём
+        faq_sec = soup.find('section', id='faq')
+        if not faq_sec and main_wrapper:
+            faq_sec = soup.new_tag('section', id='faq')
+            main_wrapper.append(faq_sec)
+
+        if faq_sec:
+            faq_sec.clear()
+            faq_sec.append(BeautifulSoup(faq_html, 'html.parser'))
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(str(soup))
+        return
+
+    # ============================================================
+    # ГЛАВНАЯ / ОБЫЧНАЯ СТРАНИЦА
+    # ============================================================
+
+    BANNER_BLOCK = (
+        '<div class="w7d52ae61">'
+        '<div class="o2118d2">'
+        '<picture>'
+        '<img class="b19fbc" src="{src}" alt="{{BRAND_NAME}}">'
+        '</picture>'
+        '</div>'
+        '</div>'
+    )
+
+    def make_section(h2_text, content_html, banner_src=None):
+        sec = soup.new_tag('section')
+        h2 = soup.new_tag('h2')
+        h2.string = h2_text
+        sec.append(h2)
+        if content_html:
+            sec.append(BeautifulSoup(content_html, 'html.parser'))
+        if banner_src:
+            sec.append(BeautifulSoup(BANNER_BLOCK.format(src=banner_src), 'html.parser'))
+        return sec
+
+    main_wrapper = soup.find('div', class_='n0dc0f73')
+    if not main_wrapper:
+        main_wrapper = soup.find('main')
+
+    # ---- Hero (section#intro) ----
+    intro_section = soup.find('section', id='intro')
+    if intro_section:
+        h1_tag = intro_section.find('h1')
+        if h1_tag and json_data.get('h1'):
+            h1_tag.string = json_data['h1']
+
+        hero_content_div = intro_section.find('div', class_='hero__content')
+        if hero_content_div:
+            hero_p = hero_content_div.find('p')
+            if hero_p:
+                desc = json_data.get('hero_desc', '')
+                if not desc:
+                    mt = json_data.get('sections', {}).get('main_text', {}).get('content', '').strip()
+                    if mt:
+                        desc = re.sub(r'<[^>]+>', '', mt.split('\n')[0]).strip()
+                if desc:
+                    hero_p.string = desc
+
+    # ---- Разбираем секции ----
+    article_sections = []
+    faq_sections = []
+    
+    faq_keywords = [
+        'faq', 'вопрос', 'pytania', 'frequent', 
+        'häufig', 'gestellte', 'fragen', 
+        'vragen', 'veelgestelde', 
+        'preguntas', 'frecuentes', 
+        'domande', 'frequenti', 
+        'ceisteanna', 'coitianta', 
+        'foire', 'questions'
+    ]
+    
+    for k, v in json_data.get('sections', {}).items():
+        if k == 'main_text':
+            continue
+        if any(w in k.lower() for w in faq_keywords):
+            faq_sections.append(v)
+        else:
+            article_sections.append(v)
+
+    BANNER_SRCS = [
+        '/images/banner_main_1.webp',
+        '/images/banner_main_2.webp',
+        '/images/banner_main_3.webp',
+    ]
+
+    # Собираем «слоты» — шаблонные секции, пригодные для замены контентом.
+    # Пропускаем: intro, faq, секции с играми (ul.la9c2)
+    existing_slots = []
+    if main_wrapper:
+        for sec in main_wrapper.find_all('section', recursive=False):
+            sid = sec.get('id', '')
+            if sid in ('intro', 'faq'):
+                continue
+            if sec.find('ul', class_='la9c2'):
+                # Секция с играми — оставляем нетронутой
+                continue
+            existing_slots.append(sec)
+
+    # Заполняем слоты контентом из ТЗ.
+    # banner_main_1 зарезервирован для hero/intro → первый article_section получает banner_main_2
+    for i, art_sec in enumerate(article_sections):
+        b_idx = (i + 1) % len(BANNER_SRCS)   # 1, 2, 0, 1, 2, … → banner_main_2/3/1 …
+        banner_src = BANNER_SRCS[b_idx]
+
+        if i < len(existing_slots):
+            sec = existing_slots[i]
+
+            # Обновляем H2
+            h2 = sec.find('h2')
+            if h2:
+                h2.string = art_sec.get('title', '')
+            else:
+                h2 = soup.new_tag('h2')
+                h2.string = art_sec.get('title', '')
+                sec.insert(0, h2)
+
+            # Удаляем старый контент (кроме H2 и div.w7d52ae61)
+            for child in list(sec.children):
+                tag_name = getattr(child, 'name', None)
+                if not tag_name:
+                    continue
+                if tag_name == 'h2':
+                    continue
+                child_classes = (child.get('class', [])
+                                 if hasattr(child, 'get') else [])
+                if isinstance(child_classes, str):
+                    child_classes = [child_classes]
+                if 'w7d52ae61' in child_classes:
+                    continue
+                child.extract()
+
+            # Вставляем новый контент
+            content_html = art_sec.get('content', '').strip()
+            banner_div = sec.find('div', class_='w7d52ae61')
+
+            if content_html:
+                content_soup = BeautifulSoup(content_html, 'html.parser')
+                if banner_div:
+                    banner_div.insert_before(content_soup)
+                else:
+                    h2_tag = sec.find('h2')
+                    if h2_tag:
+                        h2_tag.insert_after(content_soup)
+                    else:
+                        sec.append(content_soup)
+                    sec.append(BeautifulSoup(BANNER_BLOCK.format(src=banner_src), 'html.parser'))
+        else:
+            # Создаём новую секцию
+            new_sec = make_section(
+                art_sec.get('title', ''),
+                art_sec.get('content', ''),
+                banner_src
+            )
+            faq_sec_tag = main_wrapper.find('section', id='faq') if main_wrapper else None
+            if faq_sec_tag:
+                faq_sec_tag.insert_before(new_sec)
+            elif main_wrapper:
+                main_wrapper.append(new_sec)
+
+    # Удаляем лишние шаблонные слоты (ТЗ меньше шаблона)
+    for j in range(len(article_sections), len(existing_slots)):
+        existing_slots[j].decompose()
+
+    # ---- FAQ в section#faq ----
+    faq_sec_tag = main_wrapper.find('section', id='faq') if main_wrapper else None
+    if faq_sections:
+        faq_html = ''
+        for faq_sec in faq_sections:
+            faq_title = faq_sec.get('title', 'FAQ')
+            faq_html += f'<h2>{faq_title}</h2>\n'
+            # Контент уже содержит <h3>вопрос</h3><p>ответ</p>
+            faq_html += faq_sec.get('content', '') + '\n'
+        if faq_sec_tag:
+            faq_sec_tag.clear()
+            faq_sec_tag.append(BeautifulSoup(faq_html, 'html.parser'))
+        elif main_wrapper:
+            new_faq = soup.new_tag('section', id='faq')
+            new_faq.append(BeautifulSoup(faq_html, 'html.parser'))
+            main_wrapper.append(new_faq)
+    else:
+        if faq_sec_tag:
+            faq_sec_tag.decompose()
+
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(str(soup))
+
+
+# ============================================================
+# SUSHI2 — INJECT_NAVIGATION
+# ============================================================
+
+def _inject_navigation_sushi2(dst_site_dir, header_links, footer_links):
+    """
+    Вставляет навигацию в SUSHI2-шаблоны.
+    Шапка: ul.hf0d9 (desktop) + ul.e7cb498 (мобильное меню).
+    Подвал: ul.p0e1ad8b.
+    """
+    h_links = list({l['url']: l for l in header_links}.values())
+    f_links = list({l['url']: l for l in footer_links}.values())
+
+    for root, dirs, files in os.walk(dst_site_dir):
+        if 'index.html' not in files:
+            continue
+        file_path = os.path.join(root, 'index.html')
+
+        with open(file_path, 'r', encoding='utf-8') as f:
+            soup = BeautifulSoup(f.read(), 'lxml')
+
+        for ul_class in ['hf0d9', 'e7cb498']:
+            nav_ul = soup.find('ul', class_=ul_class)
+            if nav_ul:
+                nav_ul.clear()
+                for link in h_links:
+                    li = soup.new_tag('li')
+                    a = soup.new_tag('a', rel='nofollow', href=link['url'])
+                    a.string = link['title']
+                    li.append(a)
+                    nav_ul.append(li)
+
+        footer_ul = soup.find('ul', class_='p0e1ad8b')
+        if footer_ul:
+            footer_ul.clear()
+            for link in f_links:
+                li = soup.new_tag('li')
+                a = soup.new_tag('a', href=link['url'])
+                a.string = link['title']
+                li.append(a)
+                footer_ul.append(li)
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(str(soup))
+
+
+# ============================================================
+# SUSHI2 — PROCESS_PAGES
+# ============================================================
+
+def _process_pages_sushi2(tz_df, dst_site_dir, site_name):
+    """
+    Обрабатывает все страницы ТЗ для движка SUSHI2.
+    - 'main'          → example.html, 3 контентных баннера
+    - 'eeat'          → парсим вложенные Google Doc-ссылки → сервисные страницы
+    - ai-questions/faq → example.html без intro/games, только таблица/аккордеон
+    - сервисные        → policy.html (div.policy)
+    - остальные        → example.html
+    Лого: только <a id="logo-container-*"> контейнеры в шапке/aside.
+    Фавикон: <link rel="icon">.
+    Баннеры: div.w7d52ae61 > div.o2118d2 > picture > img, cycling через downloaded_images.
+    Возвращает: pages_to_keep, menu_items_js, old_brand_name, old_aff_url, old_domain
+    """
+    pages_to_keep = []
+    menu_items_js = ""
+    header_nav_links = []
+    footer_nav_links = []
+
+    example_path = os.path.join(dst_site_dir, 'example.html')
+    policy_path  = os.path.join(dst_site_dir, 'policy.html')
+
+    if not os.path.exists(example_path):
+        raise Exception("❌ Ошибка: Шаблон 'example.html' не найден!")
+
+    old_brand_name = get_old_brand_name(example_path)
+    old_aff_url    = get_old_aff_url(example_path)
+    old_domain     = get_old_domain(example_path)
+
+    # ---- Лого / Фав ----
+    global_logo_path = None
+    global_fav_path  = None
+
+    for index, row in tz_df.iterrows():
+        raw_url = str(row.get('ЧПУ | URL', '')).strip().lower().replace(' ', '')
+        if raw_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']:
+            img_link = str(row.get('Картинки / Image', '')).strip()
+            doc_link = str(row.get('Текст / Article', '')).strip()
+            links_to_use = img_link if img_link and img_link.lower() != 'nan' else doc_link
+            print(f"\n🔍 [SUSHI2] Лого/Фав: {links_to_use}")
+            logo_fav_paths = download_and_convert_gdrive_images(
+                links_to_use, 'global', dst_site_dir, is_logo_fav=True)
+            for path in logo_fav_paths:
+                fn = os.path.basename(path).lower()
+                if 'logo' in fn:
+                    global_logo_path = path
+                elif 'fav' in fn:
+                    global_fav_path = path
+            if 'images' not in pages_to_keep:
+                pages_to_keep.append('images')
+            break
+
+    # ---- Основной цикл ----
+    for index, row in tz_df.iterrows():
+        raw_url = row.get('ЧПУ | URL')
+        raw_doc = row.get('Текст / Article')
+        raw_img = row.get('Картинки / Image') if 'Картинки / Image' in tz_df.columns else None
+
+        if pd.isna(raw_url) or pd.isna(raw_doc):
+            continue
+
+        page_url = str(raw_url).strip()
+        doc_link = str(raw_doc).strip()
+        img_link = str(raw_img).strip() if pd.notna(raw_img) else ""
+
+        if not page_url or page_url.lower() == 'nan':
+            continue
+        if not doc_link or doc_link.lower() == 'nan':
+            continue
+
+        page_slug      = page_url.lower().replace(' ', '-')
+        normalized_url = page_url.lower().replace(' ', '')
+
+        if normalized_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']:
+            continue
+
+        # ---- EEAT: вложенные сервисные страницы ----
+        if page_slug == 'eeat':
+            doc_text_eeat = get_gdoc_text_and_assets(
+                doc_link, dst_site_dir, 'eeat', engine='SUSHI')
+            soup_eeat = BeautifulSoup(doc_text_eeat, 'lxml')
+            template_to_use = policy_path if os.path.exists(policy_path) else example_path
+
+            for a_tag in soup_eeat.find_all('a'):
+                policy_url  = a_tag.get('href')
+                link_text   = a_tag.get_text(strip=True)
+                parent_text = (a_tag.find_parent().get_text(strip=True)
+                               if a_tag.find_parent() else "")
+                clean_parent = re.sub(r'[:\-–—\d]+$', '', parent_text).strip()
+                display_title = link_text if len(link_text) > 4 else clean_parent
+                if not display_title:
+                    display_title = f"Policy {len(footer_nav_links) + 1}"
+
+                if policy_url and 'docs.google.com' in policy_url:
+                    policy_slug = generate_policy_slug(
+                        display_title + ' ' + link_text)
+                    footer_nav_links.append({
+                        'title': display_title.capitalize(),
+                        'url': f'/{policy_slug}/'
+                    })
+
+                    policy_text = get_gdoc_text_and_assets(
+                        policy_url, dst_site_dir, policy_slug, engine='SUSHI')
+                    policy_json = parse_doc_to_json(policy_text, engine='SUSHI')
+
+                    policy_dir  = os.path.join(dst_site_dir, policy_slug)
+                    os.makedirs(policy_dir, exist_ok=True)
+                    policy_file = os.path.join(policy_dir, 'index.html')
+                    shutil.copy2(template_to_use, policy_file)
+
+                    smart_inject_html(
+                        policy_file, policy_json, engine='SUSHI2', site_name=site_name)
+                    pages_to_keep.append(policy_slug)
+
+                    # Применяем лого/фав к сервисной странице
+                    if global_logo_path or global_fav_path:
+                        try:
+                            with open(policy_file, 'r', encoding='utf-8') as f:
+                                sp = BeautifulSoup(f.read(), 'html.parser')
+                            if global_logo_path:
+                                logo_ext = os.path.splitext(global_logo_path)[1]
+                                for la in sp.find_all(
+                                        'a', id=re.compile(r'logo-container', re.I)):
+                                    for img in la.find_all('img'):
+                                        img['src'] = f"/images/logo{logo_ext}"
+                                        img.attrs.pop('srcset', None)
+                                        img.attrs.pop('sizes', None)
+                            if global_fav_path:
+                                fav_ext = os.path.splitext(global_fav_path)[1]
+                                for lnk in sp.find_all(
+                                        'link',
+                                        rel=lambda r: r and 'icon' in ' '.join(r).lower()):
+                                    lnk['href'] = f"/images/fav{fav_ext}"
+                            with open(policy_file, 'w', encoding='utf-8') as f:
+                                f.write(str(sp))
+                        except Exception:
+                            pass
+            continue
+
+        # ---- Загружаем текст ----
+        raw_doc_text = get_gdoc_text_and_assets(
+            doc_link, dst_site_dir, page_slug, engine='SUSHI')
+        doc_text  = clean_html_styles(raw_doc_text)
+        json_data = parse_doc_to_json(doc_text, engine='SUSHI')
+
+        # ---- Определяем целевой файл ----
+        is_service = any(kw in page_slug for kw in [
+            'policy', 'privacy', 'terms', 'cookie', 'responsible',
+            'richtlinie', 'datenschutz', 'cookies', 'rules'
+        ])
+
+        # ---- Скачиваем картинки (строго max 3, пропускаем для сервисных страниц) ----
+        downloaded_images = []
+        if not is_service and img_link and img_link.lower() != 'nan':
+            downloaded_images = download_and_convert_gdrive_images(
+                img_link, page_slug, dst_site_dir, is_logo_fav=False)
+            
+            # Ограничиваем количество картинок строго 3 штуками
+            downloaded_images = downloaded_images[:3]
+            
+            if downloaded_images and 'images' not in pages_to_keep:
+                pages_to_keep.append('images')
+
+        if page_slug == 'main':
+            pages_to_keep.append('index.html')
+            target_file = os.path.join(dst_site_dir, 'index.html')
+            if not os.path.exists(target_file):
+                shutil.copy2(example_path, target_file)
+            if len(page_url) <= 15:
+                header_nav_links.append({'title': page_url.capitalize(), 'url': '/'})
+                menu_items_js += (
+                    f'{{ text: "{page_url.capitalize()}", href: "/", '
+                    f'url: "/", position: "start" }},\n'
+                )
+            # Manifest
+            main_title = json_data.get('seo_title')
+            main_desc  = json_data.get('meta_desc')
+            if main_title or main_desc:
+                for m_name in ['manifest.json', 'manifest.webmanifest',
+                               'site.webmanifest']:
+                    m_path = os.path.join(dst_site_dir, m_name)
+                    if os.path.exists(m_path):
+                        try:
+                            with open(m_path, 'r', encoding='utf-8') as mf:
+                                m_data = json.load(mf)
+                            if main_title:
+                                m_data['name'] = main_title
+                            if main_desc:
+                                m_data['description'] = main_desc
+                            with open(m_path, 'w', encoding='utf-8') as mf:
+                                json.dump(m_data, mf, ensure_ascii=False, indent=4)
+                        except Exception:
+                            pass
+        else:
+            template_src = (policy_path
+                            if (is_service and os.path.exists(policy_path))
+                            else example_path)
+            pages_to_keep.append(page_slug)
+            page_dir = os.path.join(dst_site_dir, page_slug)
+            os.makedirs(page_dir, exist_ok=True)
+            target_file = os.path.join(page_dir, 'index.html')
+            shutil.copy2(template_src, target_file)
+
+            if len(page_url) <= 15:
+                header_nav_links.append({
+                    'title': page_url.capitalize(),
+                    'url': f'/{page_slug}/'
+                })
+                menu_items_js += (
+                    f'{{ text: "{page_url.capitalize()}", '
+                    f'href: "/{page_slug}/", url: "/{page_slug}/", '
+                    f'position: "end" }},\n'
+                )
+
+        # ---- Вставляем контент ----
+        smart_inject_html(target_file, json_data, engine='SUSHI2', site_name=site_name)
+
+        # ---- Замена картинок ----
+        if downloaded_images or global_logo_path or global_fav_path:
+            try:
+                with open(target_file, 'r', encoding='utf-8') as f:
+                    soup_final = BeautifulSoup(f.read(), 'html.parser')
+
+                # Логотип — только внутри <a id="logo-container-*">
+                # (не трогаем баннерные img.b19fbc в hero/секциях)
+                if global_logo_path:
+                    logo_ext = os.path.splitext(global_logo_path)[1]
+                    for logo_a in soup_final.find_all(
+                            'a', id=re.compile(r'logo-container', re.I)):
+                        for img in logo_a.find_all('img'):
+                            img['src'] = f"/images/logo{logo_ext}"
+                            img.attrs.pop('srcset', None)
+                            img.attrs.pop('sizes', None)
+                    for meta in soup_final.find_all(
+                            'meta',
+                            attrs={'property': re.compile(r'og:image', re.I)}):
+                        meta['content'] = f"/images/logo{logo_ext}"
+
+                # Фавикон
+                if global_fav_path:
+                    fav_ext = os.path.splitext(global_fav_path)[1]
+                    for lnk in soup_final.find_all(
+                            'link',
+                            rel=lambda r: r and 'icon' in ' '.join(r).lower()):
+                        lnk['href'] = f"/images/fav{fav_ext}"
+
+                # 1. Отдельно обрабатываем баннер в #intro (вставляем логотип)
+                intro_sec = soup_final.find('section', id='intro')
+                intro_banner = intro_sec.find('div', class_='w7d52ae61') if intro_sec else None
+
+                if intro_banner and global_logo_path:
+                    intro_img = intro_banner.find('img')
+                    if intro_img:
+                        logo_ext = os.path.splitext(global_logo_path)[1]
+                        intro_img['src'] = f"/images/logo{logo_ext}"
+                        intro_img.attrs.pop('srcset', None)
+                        intro_img.attrs.pop('sizes', None)
+
+                # 2. Ищем все контентные баннеры на странице
+                banner_wrappers = soup_final.find_all('div', class_='w7d52ae61')
+
+                # Обязательно убираем intro_banner из списка, чтобы скрипт не перезаписал наш логотип!
+                if intro_banner in banner_wrappers:
+                    banner_wrappers.remove(intro_banner)
+
+                # 3. Распределяем скачанные картинки (без зацикливания, лишние слоты удаляем)
+                if downloaded_images:
+                    for b_i, wrapper in enumerate(banner_wrappers):
+                        if b_i < len(downloaded_images):
+                            pic = wrapper.find('picture')
+                            if not pic:
+                                continue
+                            img_tag = pic.find('img')
+                            if not img_tag:
+                                continue
+                            
+                            # Берём картинку по индексу (никакого cycling)
+                            img_path = downloaded_images[b_i]
+                            img_tag['src'] = f"/{img_path}"
+                            img_tag['alt'] = f"{page_slug} {b_i + 1}"
+                            img_tag.attrs.pop('srcset', None)
+                            img_tag.attrs.pop('sizes', None)
+                        else:
+                            # Если слотов для картинок больше, чем самих картинок (например, картинок 2, а слотов 4)
+                            wrapper.decompose()
+                else:
+                    # Если скачанных картинок вообще нет — убираем все контентные баннеры
+                    for bw in banner_wrappers:
+                        bw.decompose()
+
+                with open(target_file, 'w', encoding='utf-8') as f:
+                    f.write(str(soup_final))
+            except Exception as e:
+                print(f"❌ [SUSHI2] Ошибка замены картинок на {page_slug}: {e}")
+
+    inject_navigation_to_all(
+        dst_site_dir, header_nav_links, footer_nav_links, engine='SUSHI2')
+
+    return pages_to_keep, menu_items_js, old_brand_name, old_aff_url, old_domain
 
 # ============================================================
 # PROCESS_PAGES — ДВИЖОК SUSHI
@@ -3501,6 +4176,14 @@ def process_pages(tz_df, dst_site_dir, engine='SUSHI', site_name=None, template_
             'old_brand_name': old_brand_name, 'old_aff_url': old_aff_url,
             'old_domain': old_domain
         }
+    elif engine == 'SUSHI2':
+        pages_to_keep, menu_items_js, old_brand_name, old_aff_url, old_domain = \
+            _process_pages_sushi2(tz_df, dst_site_dir, site_name)
+        return {
+            'pages_to_keep': pages_to_keep, 'menu_items_js': menu_items_js,
+            'old_brand_name': old_brand_name, 'old_aff_url': old_aff_url,
+            'old_domain': old_domain
+        }
     elif engine == 'KROSS':
         pages_to_keep, menu_items_js, old_brand_name, old_aff_url = \
             _process_pages_kross(tz_df, dst_site_dir)
@@ -3621,7 +4304,7 @@ def generate_site():
         generate_sitemap_and_robots(dst_site_dir, domain, pages_to_keep)
 
         # Обновляем JS-меню
-        if engine in ('SUSHI', 'KROSS'):
+        if engine in ('SUSHI', 'KROSS', 'SUSHI2'):
             update_js_menu(dst_site_dir, menu_items_js)
         else:  # SLOTSITE
             app_js_path = os.path.join(dst_site_dir, 'app.js')

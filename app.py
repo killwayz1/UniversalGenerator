@@ -4350,9 +4350,12 @@ def generate_site():
         print(f"\n🚀 Запуск генерации. Движок: {engine} | Шаблон: {template_name} | Домен: {domain}")
 
         # Очищаем и копируем шаблон
-        if os.path.exists(base_generated_dir):
-            shutil.rmtree(base_generated_dir)
         os.makedirs(base_generated_dir, exist_ok=True)
+        
+        # Удаляем только папку КОНКРЕТНОГО сайта, а не весь пул
+        if os.path.exists(dst_site_dir):
+            shutil.rmtree(dst_site_dir)
+            
         shutil.copytree(src_template_dir, dst_site_dir)
 
         # Читаем Google Таблицу ТЗ

@@ -1,7 +1,7 @@
 {
-    "name": "Crown Coins Casino - Legal Social Play In Canada | Guide",
-    "short_name": "Crown Coins Casino",
-    "description": "Crown Coins Casino offers legal social casino entertainment in Canada | learn how it works, safety, payouts, and access-start today",
+    "name": "{{BRAND_NAME}} Casino - Legal Social Play In Canada | Guide",
+    "short_name": "{{BRAND_NAME}} Casino",
+    "description": "{{BRAND_NAME}} Casino offers legal social casino entertainment in Canada | learn how it works, safety, payouts, and access-start today",
     "start_url": "/",
     "display": "standalone",
     "orientation": "portrait-primary",

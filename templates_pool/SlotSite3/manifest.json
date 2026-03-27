@@ -1,7 +1,7 @@
 {
-    "name": "Wolf Gold Slot Guide: Play Now | Sugar Rush Slot 1000",
-    "short_name": "Wolf Gold",
-    "description": "Wolf Gold: Learn mechanics, RTP ranges and safer bankroll habits | Wolf Gold Slot sweet cluster-slot tips, compare versions, and start playing today",
+    "name": "{{BRAND_NAME}} Slot Guide: Play Now | Sugar Rush Slot 1000",
+    "short_name": "{{BRAND_NAME}}",
+    "description": "{{BRAND_NAME}}: Learn mechanics, RTP ranges and safer bankroll habits | {{BRAND_NAME}} Slot sweet cluster-slot tips, compare versions, and start playing today",
     "start_url": "/",
     "display": "standalone",
     "orientation": "portrait-primary",

@@ -16,7 +16,7 @@
 
 .elementor-125 .elementor-element.elementor-element-410a505:not(.elementor-motion-effects-element-type-background),
 .elementor-125 .elementor-element.elementor-element-410a505>.elementor-motion-effects-container>.elementor-motion-effects-layer {
-  background-image: url("../../2025/12/Wolf Gold-bg-2023.webp");
+  background-image: url("../../2025/12/{{BRAND_NAME}}-bg-2023.webp");
   background-position: center center;
   background-repeat: no-repeat;
   background-size: cover;

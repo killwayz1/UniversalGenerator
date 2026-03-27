@@ -421,3 +421,7 @@ html {
     max-width: 100% !important;
   }
 }
+/* Делаем h3 белыми только внутри первой секции */
+.elementor-element-146395e7 .auto-content-wrapper h3 {
+    color: #ffffff !important;
+}

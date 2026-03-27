@@ -3075,6 +3075,118 @@ def _process_pages_kross(tz_df, dst_site_dir):
 # PROCESS_PAGES — ДВИЖОК SLOTSITE
 # ============================================================
 
+def _download_and_convert_slotsite(drive_links_str, page_slug, dst_site_dir, is_logo_fav=False):
+    """
+    Скачивает картинки для движка SLOTSITE через gdown.
+    Использует SUB-DIRECTORY ISOLATION (аналогично KROSS): каждая ссылка
+    скачивается в отдельную подпапку (0/, 1/, 2/, …), чтобы файлы с одинаковыми
+    именами из разных ссылок не перезаписывали друг друга.
+    В отличие от KROSS, сохраняет файлы в папку /image/ (не /images/),
+    что соответствует структуре SLOTSITE-шаблонов.
+    Логотипы/фавиконы копируются как есть (с прозрачностью).
+    Контентные картинки конвертируются в PNG.
+    """
+    if (not isinstance(drive_links_str, str)
+            or not drive_links_str.strip()
+            or drive_links_str.lower() == 'nan'):
+        return []
+
+    img_dir = os.path.join(dst_site_dir, 'image')
+    os.makedirs(img_dir, exist_ok=True)
+    downloaded_paths = []
+
+    print(f"⏳ [SLOTSITE] Скачиваем картинки для [{page_slug}]: {drive_links_str}")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            if 'folder' in drive_links_str:
+                gdown.download_folder(
+                    url=drive_links_str, output=temp_dir, quiet=True, use_cookies=False)
+            else:
+                urls = re.findall(r'(https?://[^\s,]+)', drive_links_str)
+                if not urls:
+                    urls = [drive_links_str]
+                for idx, url in enumerate(urls):
+                    # ИЗОЛЯЦИЯ: отдельная папка на каждую ссылку, чтобы
+                    # файлы с одинаковыми именами не перезаписывали друг друга
+                    sub_dir = os.path.join(temp_dir, str(idx))
+                    os.makedirs(sub_dir, exist_ok=True)
+                    gdown.download(url=url, output=sub_dir + '/', quiet=True, fuzzy=True)
+        except Exception as e:
+            print(f"❌ [SLOTSITE] Ошибка загрузки: {e}")
+
+        downloaded_files = []
+        for root, dirs, files in os.walk(temp_dir):
+            for file in files:
+                ext = os.path.splitext(file)[1].lower()
+                if (ext in ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg',
+                             '.ico', '.avif', '.heic'] or not ext):
+                    downloaded_files.append(os.path.join(root, file))
+        downloaded_files.sort()
+
+        limit = 2 if is_logo_fav else 3
+        files_to_process = downloaded_files[:limit]
+
+        if not files_to_process:
+            print(f"⚠️ [SLOTSITE] Для [{page_slug}] картинки не найдены.")
+            return []
+
+        assigned_names = []
+
+        for i, file_path in enumerate(files_to_process):
+            try:
+                original_name = os.path.basename(file_path).lower()
+                ext = os.path.splitext(file_path)[1].lower()
+                if not ext:
+                    ext = '.png'
+
+                if is_logo_fav:
+                    # Логотип/фавикон: определяем имя по оригинальному имени файла
+                    if 'fav' in original_name or 'icon' in original_name:
+                        filename = f"fav{ext}"
+                    elif 'logo' in original_name:
+                        filename = f"logo{ext}"
+                    else:
+                        filename = f"logo{ext}" if i == 0 else f"fav{ext}"
+
+                    # Защита от дублей имён
+                    if filename in assigned_names:
+                        filename = f"fav{ext}" if filename.startswith("logo") else f"logo{ext}"
+
+                    assigned_names.append(filename)
+                    save_path = os.path.join(img_dir, filename)
+                    shutil.copy2(file_path, save_path)
+                    downloaded_paths.append(f"image/{filename}")
+                    print(f"✅ [SLOTSITE] Сохранено (лого/фав): {filename} (исходник: {original_name})")
+                else:
+                    # Контентная картинка: конвертируем в PNG
+                    filename = f"{page_slug}_{i+1}.png"
+                    save_path = os.path.join(img_dir, filename)
+
+                    try:
+                        if ext in ['.svg', '.avif', '.heic', '.gif']:
+                            raise ValueError(f"Формат {ext} не поддерживается PIL")
+                        img = Image.open(file_path)
+                        if (img.mode in ('RGBA', 'LA')
+                                or (img.mode == 'P' and 'transparency' in img.info)):
+                            img = img.convert('RGBA')
+                        else:
+                            img = img.convert('RGB')
+                        img.save(save_path, 'PNG')
+                    except Exception as pil_err:
+                        print(f"⚠️ [SLOTSITE] Конвертация пропущена, сохраняем как есть: {pil_err}")
+                        filename = f"{page_slug}_{i+1}{ext}"
+                        save_path = os.path.join(img_dir, filename)
+                        shutil.copy2(file_path, save_path)
+
+                    downloaded_paths.append(f"image/{filename}")
+                    print(f"✅ [SLOTSITE] Успешно сохранена: {filename}")
+            except Exception as e:
+                print(f"❌ [SLOTSITE] Ошибка обработки файла {file_path}: {e}")
+
+    return downloaded_paths
+
+
 def _process_pages_slotsite(tz_df, dst_site_dir, template_name):
     """
     Обрабатывает все страницы из ТЗ для движка SLOTSITE (Elementor).
@@ -3093,6 +3205,27 @@ def _process_pages_slotsite(tz_df, dst_site_dir, template_name):
 
     old_brand_name = get_old_brand_name(example_path)
 
+    # Предварительный поиск логотипа и фавикона
+    global_logo_path = None
+    global_fav_path = None
+
+    for index, row in tz_df.iterrows():
+        raw_url = str(row.get('ЧПУ | URL', '')).strip().lower().replace(' ', '')
+        if raw_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']:
+            img_link = str(row.get('Картинки / Image', '')).strip()
+            doc_link = str(row.get('Текст / Article', '')).strip()
+            links_to_use = img_link if img_link and img_link.lower() != 'nan' else doc_link
+
+            print(f"\n🔍 [SLOTSITE] Нашли строку ЛОГО/ФАВ. Ссылка: {links_to_use}")
+            logo_fav_paths = _download_and_convert_slotsite(
+                links_to_use, 'global', dst_site_dir, is_logo_fav=True)
+            for path in logo_fav_paths:
+                fn = os.path.basename(path).lower()
+                if 'logo' in fn: global_logo_path = path
+                elif 'fav' in fn: global_fav_path = path
+            if 'image' not in pages_to_keep: pages_to_keep.append('image')
+            break
+
     for index, row in tz_df.iterrows():
         raw_url = row.get('ЧПУ | URL')
         raw_doc = row.get('Текст / Article')
@@ -3107,17 +3240,10 @@ def _process_pages_slotsite(tz_df, dst_site_dir, template_name):
         if not page_url or page_url.lower() == 'nan' or not doc_link or doc_link.lower() == 'nan': continue
 
         page_slug = page_url.lower().replace(' ', '-')
+        normalized_url = page_url.lower().replace(' ', '')
 
-        # Лого / Фавикон (SLOTSITE использует простой download_gdrive_image)
-        if page_slug == 'fav/logo':
-            logo_path = os.path.join(dst_site_dir, 'image', 'logo.png')
-            fav_path = os.path.join(dst_site_dir, 'images', 'fav.png')
-            download_gdrive_image(doc_link, logo_path)
-            if os.path.exists(logo_path):
-                os.makedirs(os.path.dirname(fav_path), exist_ok=True)
-                shutil.copy2(logo_path, fav_path)
-            pages_to_keep.extend(['image', 'images'])
-            continue
+        # Пропускаем строку лого/фав — уже обработана выше
+        if normalized_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']: continue
 
         if page_slug == 'eeat':
             doc_text = get_gdoc_text_and_assets(doc_link, dst_site_dir, 'eeat', engine='SLOTSITE')
@@ -3143,23 +3269,41 @@ def _process_pages_slotsite(tz_df, dst_site_dir, template_name):
                     smart_inject_html(policy_file, policy_json, engine='SLOTSITE',
                                       template_name=template_name)
                     pages_to_keep.append(policy_slug)
+
+                    # Подмена логотипа/фавикона на страницах политик
+                    if global_logo_path or global_fav_path:
+                        try:
+                            with open(policy_file, 'r', encoding='utf-8') as f:
+                                soup_pol = BeautifulSoup(f.read(), 'html.parser')
+                            if global_logo_path:
+                                for img in soup_pol.find_all('img'):
+                                    src_basename = os.path.basename(
+                                        img.get('src', '').lower().split('?')[0])
+                                    if src_basename.startswith('logo.'):
+                                        img['src'] = f"/{global_logo_path}"
+                                        if 'srcset' in img.attrs: del img['srcset']
+                                        if 'sizes' in img.attrs: del img['sizes']
+                            if global_fav_path:
+                                for lnk in soup_pol.find_all('link', rel=lambda r: r and 'icon' in r.lower()):
+                                    lnk['href'] = f"/{global_fav_path}"
+                            with open(policy_file, 'w', encoding='utf-8') as f:
+                                f.write(str(soup_pol))
+                        except Exception as e:
+                            print(f"❌ [SLOTSITE] Ошибка подмены лого на политике {policy_slug}: {e}")
             continue
 
         doc_text = get_gdoc_text_and_assets(doc_link, dst_site_dir, page_slug, engine='SLOTSITE')
         json_data = parse_doc_to_json(doc_text, engine='SLOTSITE')
 
-        # SLOTSITE: картинка вставляется прямо в content как img-тег
+        # Скачиваем до 3 контентных картинок для страницы
+        downloaded_images = []
         if img_link and img_link.lower() != 'nan':
-            img_path = os.path.join(dst_site_dir, 'image', f'{page_slug}_main.png')
-            download_gdrive_image(img_link, img_path)
-            if os.path.exists(img_path):
-                if 'image' not in pages_to_keep: pages_to_keep.append('image')
-                if 'main_text' in json_data['sections']:
-                    img_html = f'<p class="auto-image-row"><img src="/image/{page_slug}_main.png" alt="{page_slug}"></p>\n'
-                    json_data['sections']['main_text']['content'] = (
-                        img_html + json_data['sections']['main_text']['content'])
+            downloaded_images = _download_and_convert_slotsite(
+                img_link, page_slug, dst_site_dir, is_logo_fav=False)
+            if downloaded_images and 'image' not in pages_to_keep:
+                pages_to_keep.append('image')
 
-        if page_slug == 'main':
+        if page_slug in ['main', 'home']:
             pages_to_keep.append('index.html')
             target_file = os.path.join(dst_site_dir, 'index.html')
             shutil.copy2(example_path, target_file)
@@ -3186,6 +3330,151 @@ def _process_pages_slotsite(tz_df, dst_site_dir, template_name):
                 menu_items_js += f'{{ text: "{page_url.capitalize()}", url: "/{page_slug}/", position: "end" }},\n'
 
         smart_inject_html(target_file, json_data, engine='SLOTSITE', template_name=template_name)
+
+        # Подмена картинок в HTML после вставки контента
+        if downloaded_images or global_logo_path or global_fav_path:
+            try:
+                with open(target_file, 'r', encoding='utf-8') as f:
+                    soup_final = BeautifulSoup(f.read(), 'html.parser')
+
+                # Замена логотипа: только img у которых ИМЯФАЙЛА начинается с 'logo.'
+                # (чтобы не трогать спонсорские изображения типа Leovegas-Logo.webp)
+                if global_logo_path:
+                    for img in soup_final.find_all('img'):
+                        src_basename = os.path.basename(
+                            img.get('src', '').lower().split('?')[0])
+                        if src_basename.startswith('logo.'):
+                            img['src'] = f"/{global_logo_path}"
+                            if 'srcset' in img.attrs: del img['srcset']
+                            if 'sizes' in img.attrs: del img['sizes']
+
+                # Замена фавикона: link rel="icon" / rel="shortcut icon"
+                if global_fav_path:
+                    for lnk in soup_final.find_all('link', rel=lambda r: r and 'icon' in r.lower()):
+                        lnk['href'] = f"/{global_fav_path}"
+
+                # Замена контентных картинок.
+                # SLOTSITE-шаблоны используют два вида слотов для контентных изображений:
+                #   1. Elementor image-виджеты: div[data-widget_type="image.default"] > img
+                #      (оба шаблона; шаблон 2 — login1.webp, main(1).png)
+                #   2. Блоки img_flex: div.img_flex > img
+                #      (шаблон 1 — promo1, promo3; шаблон 2 — login3)
+                # Исключаем "карточки спонсоров" — их отличительный признак: наличие
+                # виджета rating.default внутри того же блока-карточки (e-con).
+                # Исключаем также изображения внутри header/footer/nav.
+                if downloaded_images:
+                    main_content = soup_final.find('div', attrs={'data-elementor-type': 'wp-page'})
+                    if not main_content:
+                        main_content = soup_final.find('div', attrs={'data-elementor-type': 'single-post'})
+                    if not main_content:
+                        main_content = soup_final.body if soup_final.body else soup_final
+
+                    def _is_sponsor_card_img(img_tag):
+                        """
+                        Возвращает True только если img является слотом изображения
+                        в карточке казино/спонсора.
+
+                        Логика определения карточки спонсора:
+                        ─────────────────────────────────────
+                        1. img внутри div.img_flex → всегда контентная картинка (False).
+                           img_flex используется только для контентных блоков
+                           (icon-box, heading и т.п.), не для карточек казино.
+
+                        2. img внутри image.default виджета → находим БЛИЖАЙШИЙ e-con
+                           родитель этого виджета (card_econ). Это и есть потенциальный
+                           контейнер карточки.
+                           Карточка спонсора подтверждается, если внутри card_econ есть
+                           rating.default или tp-button.default виджет, при этом между
+                           card_econ и найденным rating-виджетом не более одной
+                           дополнительной e-con границы (допускается разбивка карточки
+                           на колонки через вложенный e-con).
+
+                        Почему не «идём вверх по всем предкам»:
+                        ─────────────────────────────────────────
+                        • Шаблон А (login-тип): login1.webp завёрнут в свой e-con e-child
+                          (643e5e1e), который чистый. Внешний e-con e-child (77ed75f7)
+                          содержит казино-карточки в другой колонке — ходить туда нельзя.
+                        • Шаблон Б (promo-тип): promo1/promo3 лежат в img_flex внутри
+                          больших секционных e-con e-child, которые могут содержать
+                          казино-таблицы ниже на странице — ходить туда тоже нельзя.
+                        Оба случая решаются одним правилом: смотрим только ВНУТРЬ
+                        ближайшего e-con родителя виджета, не выше.
+                        """
+                        # ── Правило 1: img_flex → всегда контентная картинка ──────────
+                        if img_tag.find_parent(
+                                'div', class_=lambda c: c and 'img_flex' in c):
+                            return False
+
+                        # ── Правило 2: image.default → проверяем карточный контейнер ──
+                        image_widget = img_tag.find_parent(
+                            'div', attrs={'data-widget_type': 'image.default'})
+                        if not image_widget:
+                            return False
+
+                        # Ближайший e-con родитель виджета — потенциальный контейнер карточки
+                        card_econ = image_widget.find_parent(
+                            'div', class_=lambda c: c and 'e-con' in c.split())
+                        if not card_econ:
+                            return False
+
+                        # Ищем rating/button виджет ВНУТРИ card_econ,
+                        # но считаем сколько e-con границ отделяет его от card_econ.
+                        # В настоящей карточке казино: rating и image в одном e-con
+                        # (0 границ) или разделены максимум одним вложенным e-con-столбцом
+                        # (1 граница). Если границ больше — это вложенная подсекция,
+                        # не часть той же карточки.
+                        rating_re = re.compile(r'(rating|tp-button)\.default', re.I)
+                        for rating_tag in card_econ.find_all(
+                                'div', attrs={'data-widget_type': rating_re}):
+                            econ_boundaries = 0
+                            for ancestor in rating_tag.parents:
+                                if ancestor is card_econ:
+                                    break
+                                if (hasattr(ancestor, 'get')
+                                        and 'e-con' in (ancestor.get('class') or [])):
+                                    econ_boundaries += 1
+                            if econ_boundaries <= 1:
+                                return True  # Карточка спонсора подтверждена
+
+                        return False
+
+                    content_imgs = []
+                    seen_img_ids = set()
+
+                    for img in main_content.find_all('img'):
+                        src = img.get('src', '').lower()
+                        src_basename = os.path.basename(src.split('?')[0])
+                        # Пропускаем файл логотипа и фавикона
+                        if src_basename.startswith('logo.') or src_basename.startswith('fav.'):
+                            continue
+                        # Пропускаем img вне контентных зон
+                        if img.find_parent(['header', 'footer', 'nav', 'aside']):
+                            continue
+                        if img.find_parent('div', attrs={'data-elementor-type': ['header', 'footer', 'popup']}):
+                            continue
+                        # Пропускаем изображения внутри карточек спонсоров/казино
+                        if _is_sponsor_card_img(img):
+                            continue
+                        # Контентный слот: внутри elementor-widget-image ИЛИ внутри img_flex
+                        in_widget = bool(img.find_parent(
+                            'div', attrs={'data-widget_type': 'image.default'}))
+                        in_flex = bool(img.find_parent(
+                            'div', class_=lambda c: c and 'img_flex' in c))
+                        if (in_widget or in_flex) and id(img) not in seen_img_ids:
+                            seen_img_ids.add(id(img))
+                            content_imgs.append(img)
+
+                    for i, img_tag in enumerate(content_imgs[:3]):
+                        img_path = downloaded_images[i % len(downloaded_images)]
+                        img_tag['src'] = f"/{img_path}"
+                        img_tag['alt'] = f"{page_slug} image {i+1}"
+                        if 'srcset' in img_tag.attrs: del img_tag['srcset']
+                        if 'sizes' in img_tag.attrs: del img_tag['sizes']
+
+                with open(target_file, 'w', encoding='utf-8') as f:
+                    f.write(str(soup_final))
+            except Exception as e:
+                print(f"❌ [SLOTSITE] Ошибка подмены HTML картинок на странице {page_slug}: {e}")
 
     inject_navigation_to_all(dst_site_dir, header_nav_links, footer_nav_links, engine='SLOTSITE')
 

@@ -2755,7 +2755,18 @@ def _smart_inject_html_sushi2(file_path, json_data, site_name=None):
 
         if faq_sec:
             faq_sec.clear()
-            faq_sec.append(BeautifulSoup(faq_html, 'html.parser'))
+            
+            # Парсим собранный HTML, чтобы найти таблицы и добавить им класс
+            faq_soup_content = BeautifulSoup(faq_html, 'html.parser')
+            for tbl in faq_soup_content.find_all('table'):
+                existing_classes = tbl.get('class', [])
+                if isinstance(existing_classes, str):
+                    existing_classes = [existing_classes]
+                # Добавляем наш особый класс
+                tbl['class'] = existing_classes + ['ai-questions-table']
+                
+            # Вставляем обновленный контент с классами
+            faq_sec.append(faq_soup_content)
 
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(str(soup))

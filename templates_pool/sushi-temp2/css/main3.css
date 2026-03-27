@@ -3395,14 +3395,118 @@ main {
 .policy h2 {
   margin: 20px 0 10px;
 }
+
 /* --- Исправление пропорций для баннеров и логотипа --- */
 .w7d52ae61 .o2118d2 picture img.b19fbc {
+  width: 100%;
+  max-width: 100%;
+  height: auto !important;
+  /* Перебиваем жесткие высоты из старых медиа-запросов */
+  max-height: 450px;
+  /* Ограничиваем высоту, чтобы картинка не занимала весь экран */
+  aspect-ratio: auto;
+  /* Отключаем жесткую пропорцию 1200/400 */
+  object-fit: contain;
+  /* Картинка помещается целиком без обрезки */
+  display: block;
+  margin: 0 auto;
+  /* Центрируем картинку, если она меньше ширины блока */
+}
+
+/* --- Отмена горизонтального скролла для таблиц на странице AI Questions --- */
+@media (max-width: 500px) {
+  table.ai-questions-table {
+    display: table !important;
+    /* Возвращаем стандартное поведение таблицы */
+    overflow-x: visible !important;
+    /* Убираем горизонтальный скролл */
+    white-space: normal !important;
+    /* Разрешаем тексту переноситься на новые строки */
+    word-break: break-word;
+    /* Защита от слишком длинных слов/ссылок */
+    width: 100% !important;
+  }
+
+  table.ai-questions-table td,
+  table.ai-questions-table th {
+    white-space: normal !important;
+    /* Разрешаем перенос текста внутри ячеек */
+    width: auto !important;
+    /* Убираем жесткую ширину 100%, чтобы колонки делились пропорционально */
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (max-width: 767px) {
+  .mobile-fixed-button {
+    position: fixed;
+    bottom: 0;
+    left: 0;
     width: 100%;
-    max-width: 100%;
-    height: auto !important; /* Перебиваем жесткие высоты из старых медиа-запросов */
-    max-height: 450px;       /* Ограничиваем высоту, чтобы картинка не занимала весь экран */
-    aspect-ratio: auto;      /* Отключаем жесткую пропорцию 1200/400 */
-    object-fit: contain;     /* Картинка помещается целиком без обрезки */
+    z-index: 9999;
+    background: transparent;
+    padding: 10px 15px;
+    box-sizing: border-box;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    pointer-events: none;
+  }
+
+  .mobile-fixed-button .mobile-fixed-button-link {
+    flex: 1;
     display: block;
-    margin: 0 auto;          /* Центрируем картинку, если она меньше ширины блока */
+    background: #e03030;
+    color: #ffffff;
+    text-align: center;
+    padding: 16px 0;
+    border-radius: 60px;
+    font-size: 18px;
+    font-weight: bold;
+    text-decoration: none;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+    border: none;
+    pointer-events: auto;
+    transition: background 0.2s;
+  }
+
+  .mobile-fixed-button .mobile-fixed-button-link:hover {
+    background: #e03030;
+  }
+
+  .mobile-fixed-button .mobile-scroll-top {
+    width: 56px;
+    height: 56px;
+    background: #e03030;
+    color: #ffffff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    font-size: 28px;
+    font-weight: bold;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
+    pointer-events: auto;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+
+  .mobile-fixed-button .mobile-scroll-top:hover {
+    background: #e03030;
+  }
+
+  /* Делаем отступ внутри футера, чтобы поднять его текст выше фиксированной кнопки */
+  footer, .zf298 {
+    padding-bottom: 90px !important; 
+  }
+} /* <-- Вот здесь правильно закрывается медиа-запрос для мобильных */
+
+@media (min-width: 768px) {
+  .mobile-fixed-button {
+    display: none;
+  }
 }

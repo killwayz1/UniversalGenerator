@@ -4316,7 +4316,8 @@ section {
 }
 
 .seo-content {
-    min-width: 0; /* Предотвращает разлом грида длинными ссылками/таблицами */
+    min-width: 0;
+    /* Предотвращает разлом грида длинными ссылками/таблицами */
 }
 
 .content-navigation {
@@ -4430,18 +4431,22 @@ section {
         grid-template-columns: 1fr;
         gap: 24px;
     }
+
     .content-navigation {
         position: relative;
         top: 0;
         margin-bottom: 20px;
     }
+
     .content-split-block {
         grid-template-columns: 1fr;
         gap: 32px;
         padding: 32px;
     }
+
     .split-image-col {
-        order: -1; /* Картинка сверху на мобильных */
+        order: -1;
+        /* Картинка сверху на мобильных */
     }
 }
 
@@ -4450,16 +4455,28 @@ section {
         padding: 24px;
         gap: 24px;
     }
-    .split-text-col h3 { font-size: 24px; }
-    .split-text-col p { font-size: 15px; }
+
+    .split-text-col h3 {
+        font-size: 24px;
+    }
+
+    .split-text-col p {
+        font-size: 15px;
+    }
 }
+
 /* Универсальное правило для всех полноразмерных картинок */
 img.attachment-full.size-full {
-    width: auto;         /* Сбрасываем жесткую ширину из HTML, картинка берет свой естественный размер */
-    height: auto;        /* Всегда сохраняем правильные пропорции */
-    max-width: 100%;     /* Главное правило: картинка НИКОГДА не будет шире экрана (идеально для телефонов) */
-    display: block;      /* Делаем блоком для выравнивания */
-    margin: 0 auto;      /* Выравниваем строго по центру */
+    width: auto;
+    /* Сбрасываем жесткую ширину из HTML, картинка берет свой естественный размер */
+    height: auto;
+    /* Всегда сохраняем правильные пропорции */
+    max-width: 100%;
+    /* Главное правило: картинка НИКОГДА не будет шире экрана (идеально для телефонов) */
+    display: block;
+    /* Делаем блоком для выравнивания */
+    margin: 0 auto;
+    /* Выравниваем строго по центру */
 }
 
 /* Ограничитель для слишком больших оригиналов на ПК */
@@ -4469,39 +4486,48 @@ img.attachment-full.size-full {
            Этот параметр ставит "потолок" ширины. 
            Можете поменять 800px на любой комфортный для вашего дизайна размер (например, 600px или 900px). 
            Если оригинал меньше 800px, он останется своим (маленьким). */
-        max-width: 800px; 
+        max-width: 800px;
     }
 }
 
 /* 3. Центрирование кнопки */
 button.button-link {
     display: block;
-    margin: 25px auto; /* 20px - отступ сверху и снизу, auto - выравнивает по центру */
+    margin: 25px auto;
+    /* 20px - отступ сверху и снизу, auto - выравнивает по центру */
     width: fit-content;
 }
+
 .dropdown-menu {
     /* Убираем внешний отступ, чтобы не было разрыва */
-    margin-top: 0; 
+    margin-top: 0;
     padding-top: 10px;
 }
 
 main {
-    padding-top: 15px; 
+    padding-top: 15px;
 }
+
 .services-table {
     min-width: 100%;
     display: table;
     width: 100%;
 }
+
 /* Правило для мобильных экранов (например, до 768px) */
 @media (max-width: 768px) {
     .services-table {
-        display: block; /* Заставляем таблицу вести себя как блок-контейнер */
-        overflow-x: auto; /* Включаем горизонтальный скролл */
-        -webkit-overflow-scrolling: touch; /* Плавная прокрутка на iOS */
-        white-space: nowrap; /* Запрещаем перенос текста, чтобы таблица не сжималась, а скроллилась */
+        display: block;
+        /* Заставляем таблицу вести себя как блок-контейнер */
+        overflow-x: auto;
+        /* Включаем горизонтальный скролл */
+        -webkit-overflow-scrolling: touch;
+        /* Плавная прокрутка на iOS */
+        white-space: nowrap;
+        /* Запрещаем перенос текста, чтобы таблица не сжималась, а скроллилась */
     }
 }
+
 html {
     scroll-behavior: smooth;
 }
@@ -4533,7 +4559,7 @@ html {
         font-size: 18px;
         font-weight: bold;
         text-decoration: none;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
         border: none;
         pointer-events: auto;
         transition: background 0.2s;
@@ -4555,10 +4581,10 @@ html {
         text-decoration: none;
         font-size: 28px;
         font-weight: bold;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.2);
         pointer-events: auto;
         transition: background 0.2s;
-        flex-shrink: 0; 
+        flex-shrink: 0;
     }
 
     .mobile-fixed-button .mobile-scroll-top:hover {

@@ -5598,3 +5598,16 @@ img:is([sizes="auto" i], [sizes^="auto," i]) {
     font-size: 2.3rem !important;
     font-weight: 700 !important;
 }
+.translate {
+  bottom: 5rem !important;
+}
+
+@media (min-width: 768px) {
+  .translate {
+    bottom: 1rem !important;
+  }
+}
+
+.current-language {
+  border-radius: 10px !important;
+}

@@ -428,3 +428,16 @@ html {
 .elementor-element-2bba504{
   padding-top: 8rem;
 }
+.translate {
+  bottom: 5rem !important;
+}
+
+@media (min-width: 768px) {
+  .translate {
+    bottom: 1rem !important;
+  }
+}
+
+.current-language {
+  border-radius: 10px !important;
+}

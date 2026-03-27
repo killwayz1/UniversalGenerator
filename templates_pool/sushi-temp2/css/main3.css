@@ -3460,7 +3460,7 @@ html {
   .mobile-fixed-button .mobile-fixed-button-link {
     flex: 1;
     display: block;
-    background: #e03030;
+    background: #ffba00;
     color: #ffffff;
     text-align: center;
     padding: 16px 0;
@@ -3475,13 +3475,13 @@ html {
   }
 
   .mobile-fixed-button .mobile-fixed-button-link:hover {
-    background: #e03030;
+    background: #ffba00;
   }
 
   .mobile-fixed-button .mobile-scroll-top {
     width: 56px;
     height: 56px;
-    background: #e03030;
+    background: #ffba00;
     color: #ffffff;
     border-radius: 50%;
     display: flex;
@@ -3497,7 +3497,7 @@ html {
   }
 
   .mobile-fixed-button .mobile-scroll-top:hover {
-    background: #e03030;
+    background: #ffba00;
   }
 
   /* Отступ внутри футера, чтобы поднять его текст выше фиксированной кнопки */
@@ -3512,4 +3512,17 @@ html {
   .mobile-fixed-button {
     display: none !important;
   }
+}
+.translate {
+  bottom: 5rem !important;
+}
+
+@media (min-width: 768px) {
+  .translate {
+    bottom: 1rem !important;
+  }
+}
+
+.current-language {
+  border-radius: 10px !important;
 }

@@ -21,6 +21,14 @@ ssl._create_default_https_context = ssl._create_unverified_context
 app = Flask(__name__, template_folder='.')
 
 
+def _bs4_safe_append(parent, html_str):
+    """Safely append an HTML fragment to a BeautifulSoup tag without lxml wrapping issues."""
+    from bs4 import BeautifulSoup as _BS
+    parsed = _BS(html_str, 'html.parser')
+    for child in list(parsed.children):
+        parent.append(child)
+
+
 # ============================================================
 # TEMPLATE ENGINE DETECTION
 # ============================================================

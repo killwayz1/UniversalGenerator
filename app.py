@@ -562,6 +562,42 @@ def download_and_convert_gdrive_images(drive_links_str, page_slug, dst_site_dir,
 # (три версии — одна на каждый движок)
 # ============================================================
 
+# Текст ошибки, которую Google Docs возвращает вместо документа
+_GDOC_ERROR_PHRASES = [
+    "google docs encountered an error",
+    "please try reloading this page",
+    "coming back to it in a few minutes",
+]
+
+def _fetch_gdoc_html(export_url, headers=None, max_retries=6, delay=4):
+    """
+    Загружает экспортированный HTML Google Doc с автоматическим повтором.
+    Если Google вернул страницу с ошибкой — ждёт delay секунд и пробует снова.
+    Выбрасывает RuntimeError, если все попытки исчерпаны.
+    """
+    import time
+    kwargs = dict(verify=False, timeout=30)
+    if headers:
+        kwargs['headers'] = headers
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.get(export_url, **kwargs)
+            lower_text = response.text.lower()
+            if any(phrase in lower_text for phrase in _GDOC_ERROR_PHRASES):
+                print(f"⚠️  Google Docs вернул страницу с ошибкой (попытка {attempt}/{max_retries}). "
+                      f"Повтор через {delay}с…")
+                time.sleep(delay)
+                continue
+            return response
+        except requests.RequestException as e:
+            print(f"⚠️  Сетевая ошибка при загрузке Google Doc (попытка {attempt}/{max_retries}): {e}")
+            if attempt < max_retries:
+                time.sleep(delay)
+    raise RuntimeError(
+        f"Не удалось загрузить Google Doc после {max_retries} попыток: {export_url}"
+    )
+
 def _get_gdoc_sushi(url, dst_site_dir, page_slug):
     """
     Загружает Google Doc и извлекает контент.
@@ -569,7 +605,7 @@ def _get_gdoc_sushi(url, dst_site_dir, page_slug):
     """
     export_url = (url.replace('/edit?usp=sharing', '/export?format=html')
                      .replace('/edit', '/export?format=html'))
-    response = requests.get(export_url, verify=False)
+    response = _fetch_gdoc_html(export_url)
     soup = BeautifulSoup(response.text, 'lxml')
 
     # Очищаем атрибуты у всех тегов
@@ -672,7 +708,7 @@ def _get_gdoc_kross(url, dst_site_dir, page_slug):
             '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         )
     }
-    response = requests.get(export_url, headers=headers, verify=False)
+    response = _fetch_gdoc_html(export_url, headers=headers)
     soup = BeautifulSoup(response.text, 'lxml')
 
     img_dir = os.path.join(dst_site_dir, 'image')
@@ -772,7 +808,7 @@ def _get_gdoc_slotsite(url, dst_site_dir, page_slug):
     """
     export_url = (url.replace('/edit?usp=sharing', '/export?format=html')
                      .replace('/edit', '/export?format=html'))
-    response = requests.get(export_url, verify=False)
+    response = _fetch_gdoc_html(export_url)
     soup = BeautifulSoup(response.text, 'lxml')
 
     img_dir = os.path.join(dst_site_dir, 'image')

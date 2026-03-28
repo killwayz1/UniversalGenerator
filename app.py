@@ -3127,19 +3127,26 @@ def _process_pages_sushi2(tz_df, dst_site_dir, site_name):
 
     for index, row in tz_df.iterrows():
         raw_url = str(row.get('ЧПУ | URL', '')).strip().lower().replace(' ', '')
-        if raw_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']:
+        
+        # Гибкая проверка: ищем корни 'logo' и 'fav' вместе, либо точное совпадение по одному слову
+        is_logo_fav = ('logo' in raw_url and 'fav' in raw_url) or (raw_url in ['logo', 'fav', 'favicon'])
+        
+        if is_logo_fav:
             img_link = str(row.get('Картинки / Image', '')).strip()
             doc_link = str(row.get('Текст / Article', '')).strip()
             links_to_use = img_link if img_link and img_link.lower() != 'nan' else doc_link
             print(f"\n🔍 [SUSHI2] Лого/Фав: {links_to_use}")
+            
             logo_fav_paths = download_and_convert_gdrive_images(
                 links_to_use, 'global', dst_site_dir, is_logo_fav=True)
+            
             for path in logo_fav_paths:
                 fn = os.path.basename(path).lower()
                 if 'logo' in fn:
                     global_logo_path = path
                 elif 'fav' in fn:
                     global_fav_path = path
+                    
             if 'images' not in pages_to_keep:
                 pages_to_keep.append('images')
             break
@@ -3424,7 +3431,11 @@ def _process_pages_sushi(tz_df, dst_site_dir, site_name):
 
     for index, row in tz_df.iterrows():
         raw_url = str(row.get('ЧПУ | URL', '')).strip().lower().replace(' ', '')
-        if raw_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']:
+        
+        # Гибкая проверка: ищем корни 'logo' и 'fav' вместе, либо точное совпадение по одному слову
+        is_logo_fav = ('logo' in raw_url and 'fav' in raw_url) or (raw_url in ['logo', 'fav', 'favicon'])
+        
+        if is_logo_fav:
             img_link = str(row.get('Картинки / Image', '')).strip()
             doc_link = str(row.get('Текст / Article', '')).strip()
             links_to_use = img_link if img_link and img_link.lower() != 'nan' else doc_link
@@ -3711,7 +3722,11 @@ def _process_pages_kross(tz_df, dst_site_dir):
 
     for index, row in tz_df.iterrows():
         raw_url = str(row.get('ЧПУ | URL', '')).strip().lower().replace(' ', '')
-        if raw_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']:
+        
+        # Гибкая проверка: ищем корни 'logo' и 'fav' вместе, либо точное совпадение по одному слову
+        is_logo_fav = ('logo' in raw_url and 'fav' in raw_url) or (raw_url in ['logo', 'fav', 'favicon'])
+        
+        if is_logo_fav:
             img_link = str(row.get('Картинки / Image', '')).strip()
             doc_link = str(row.get('Текст / Article', '')).strip()
             links_to_use = img_link if img_link and img_link.lower() != 'nan' else doc_link
@@ -4032,7 +4047,11 @@ def _process_pages_slotsite(tz_df, dst_site_dir, template_name):
 
     for index, row in tz_df.iterrows():
         raw_url = str(row.get('ЧПУ | URL', '')).strip().lower().replace(' ', '')
-        if raw_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']:
+        
+        # Гибкая проверка: ищем корни 'logo' и 'fav' вместе, либо точное совпадение по одному слову
+        is_logo_fav = ('logo' in raw_url and 'fav' in raw_url) or (raw_url in ['logo', 'fav', 'favicon'])
+        
+        if is_logo_fav:
             img_link = str(row.get('Картинки / Image', '')).strip()
             doc_link = str(row.get('Текст / Article', '')).strip()
             links_to_use = img_link if img_link and img_link.lower() != 'nan' else doc_link

@@ -121,3 +121,34 @@ document.addEventListener('DOMContentLoaded', function () {
     wrapper.appendChild(table);
   });
 });
+
+
+const headerMenu = document.querySelector('.hf0d9');
+
+if (headerMenu) {
+    const maxItems = 4;
+    const menuItems = Array.from(headerMenu.children);
+
+    if (menuItems.length > maxItems) {
+        const moreLi = document.createElement('li');
+        moreLi.className = 'lb98aa16';
+
+        moreLi.innerHTML = `
+        <a href="#" class="he0a1e52" onclick="event.preventDefault()">
+          More
+          <svg class="r5446d154" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </a>
+        <ul class="o9e1ae md90f6"></ul>
+      `;
+
+        const dropDown = moreLi.querySelector('ul');
+
+        for (let i = maxItems; i < menuItems.length; i++) {
+            dropDown.appendChild(menuItems[i]);
+        }
+
+        headerMenu.appendChild(moreLi);
+    }
+}

@@ -131,84 +131,176 @@ def analyze_colors():
     engine = detect_template_engine(template_dir)
     color_counts = Counter()
 
-    if engine in ('SUSHI', 'SUSHI2'):  # SUSHI/WINZ: hex + var() fallback; HTML/CSS/JSON; top-20
-        pattern_elementor = re.compile(
-            r'--e-global-color-[\w-]+:\s*(#[0-9a-fA-F]{3,8})(?![0-9a-fA-F])', re.IGNORECASE)
-        pattern_var_fallback = re.compile(
-            r'var\(--[\w-]+,\s*(#[0-9a-fA-F]{3,8})\)', re.IGNORECASE)
-        pattern_any_hex = re.compile(
-            r'(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})(?![0-9a-fA-F])', re.IGNORECASE)
-        scan_ext = ('.html', '.css', '.json')
-        excluded = {'#FFFFFF', '#000000'}
+    # ── Вспомогательные конвертеры ─────────────────────────────────────────────
 
-        for root, dirs, files in os.walk(template_dir):
-            for file_name in files:
-                if file_name.endswith(scan_ext):
-                    file_path = os.path.join(root, file_name)
-                    try:
-                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            content = f.read()
-                        found = (pattern_elementor.findall(content)
-                                 + pattern_var_fallback.findall(content)
-                                 + pattern_any_hex.findall(content))
-                        for c in found:
-                            c = c.upper()
-                            if len(c) == 4:
-                                c = '#' + c[1]*2 + c[2]*2 + c[3]*2
-                            if c not in excluded:
-                                color_counts[c] += 1
-                    except:
-                        pass
-        top_colors = [color for color, _ in color_counts.most_common(20)]
+    def _clamp(v, lo=0, hi=255):
+        return max(lo, min(hi, v))
 
-    elif engine == 'KROSS':
-        # KROSS: любые CSS-переменные + любые hex; HTML/CSS/JSON/JS; top-30
-        pattern_vars = re.compile(
-            r'--[\w-]+:\s*(#[0-9a-fA-F]{3,8})(?![0-9a-fA-F])', re.IGNORECASE)
-        pattern_any_hex = re.compile(
-            r'(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})(?![0-9a-fA-F])', re.IGNORECASE)
-        scan_ext = ('.html', '.css', '.json', '.js')
-        excluded = {'#FFFFFF', '#000000', '#FFF', '#000'}
+    def _rgb_to_hex(r, g, b):
+        """rgb-компоненты (0–255) → '#RRGGBB'."""
+        try:
+            return '#{:02X}{:02X}{:02X}'.format(
+                _clamp(int(round(float(r)))),
+                _clamp(int(round(float(g)))),
+                _clamp(int(round(float(b))))
+            )
+        except Exception:
+            return None
 
-        for root, dirs, files in os.walk(template_dir):
-            for file_name in files:
-                if file_name.endswith(scan_ext):
-                    file_path = os.path.join(root, file_name)
-                    try:
-                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            content = f.read()
-                        found = pattern_vars.findall(content) + pattern_any_hex.findall(content)
-                        for c in found:
-                            c = c.upper()
-                            if len(c) == 4:
-                                c = '#' + c[1]*2 + c[2]*2 + c[3]*2
-                            if c not in excluded:
-                                color_counts[c] += 1
-                    except:
-                        pass
-        top_colors = [color for color, _ in color_counts.most_common(30)]
+    def _hsl_to_hex(h, s, l):
+        """HSL (h: 0–360, s/l: 0–100 или 0.0–1.0) → '#RRGGBB'."""
+        try:
+            h, s, l = float(h), float(s), float(l)
+            if s > 1:
+                s /= 100.0
+            if l > 1:
+                l /= 100.0
+            h = h % 360
+            c = (1 - abs(2 * l - 1)) * s
+            x = c * (1 - abs((h / 60) % 2 - 1))
+            m = l - c / 2
+            if   0   <= h < 60:  r1, g1, b1 = c, x, 0
+            elif 60  <= h < 120: r1, g1, b1 = x, c, 0
+            elif 120 <= h < 180: r1, g1, b1 = 0, c, x
+            elif 180 <= h < 240: r1, g1, b1 = 0, x, c
+            elif 240 <= h < 300: r1, g1, b1 = x, 0, c
+            else:                r1, g1, b1 = c, 0, x
+            return _rgb_to_hex(
+                round((r1 + m) * 255),
+                round((g1 + m) * 255),
+                round((b1 + m) * 255)
+            )
+        except Exception:
+            return None
 
-    else:  # SLOTSITE
-        # SLOTSITE: только Elementor глобальные цвета; HTML/CSS/JSON; top-30
-        pattern_global = re.compile(
-            r'--e-global-color-[\w-]+:\s*(#[0-9a-fA-F]{3,8})(?![0-9a-fA-F])', re.IGNORECASE)
-        scan_ext = ('.html', '.css', '.json')
+    def _hex_normalize(h):
+        """Нормализует HEX-строку: #abc → #AABBCC, #aabbcc → #AABBCC."""
+        h = h.upper()
+        if len(h) == 4:  # #RGB
+            h = '#' + h[1]*2 + h[2]*2 + h[3]*2
+        return h if len(h) == 7 else None
 
-        for root, dirs, files in os.walk(template_dir):
-            for file_name in files:
-                if file_name.endswith(scan_ext):
-                    file_path = os.path.join(root, file_name)
-                    try:
-                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            content = f.read()
-                        for c in pattern_global.findall(content):
-                            c = c.upper()
-                            if len(c) == 4:
-                                c = '#' + c[1]*2 + c[2]*2 + c[3]*2
-                            color_counts[c] += 1
-                    except:
-                        pass
-        top_colors = [color for color, _ in color_counts.most_common(30)]
+    # ── Регулярные выражения для всех форматов цветов ─────────────────────────
+
+    # HEX: #RGB или #RRGGBB (не #RRGGBBAA чтобы не ловить ID-хэши в JS)
+    RE_HEX = re.compile(
+        r'(?<![0-9a-fA-F])(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})(?![0-9a-fA-F])')
+
+    # rgb(r, g, b) и rgba(r, g, b, a) — целые и дробные компоненты
+    RE_RGB = re.compile(
+        r'rgba?\(\s*(\d{1,3}(?:\.\d+)?)\s*,\s*(\d{1,3}(?:\.\d+)?)'
+        r'\s*,\s*(\d{1,3}(?:\.\d+)?)\s*(?:,\s*[\d.]+\s*)?\)',
+        re.IGNORECASE)
+
+    # hsl(h, s%, l%) и hsla(...)
+    RE_HSL = re.compile(
+        r'hsla?\(\s*([\d.]+)\s*,\s*([\d.]+)%?\s*,\s*([\d.]+)%?\s*(?:,\s*[\d.]+\s*)?\)',
+        re.IGNORECASE)
+
+    # CSS-переменная с цветовым значением:  --foo: <color>
+    RE_CSS_VAR = re.compile(
+        r'--[\w-]+\s*:\s*'
+        r'(?:(#[0-9a-fA-F]{3,8})'                                      # HEX
+        r'|rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)[^)]*\)'   # rgb/rgba
+        r'|hsla?\(\s*([\d.]+)\s*,\s*([\d.]+)%?\s*,\s*([\d.]+)%?[^)]*\))',  # hsl/hsla
+        re.IGNORECASE)
+
+    # var(--foo, fallback) — подхватываем fallback-значение
+    RE_VAR_FALLBACK = re.compile(
+        r'var\(--[\w-]+,\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\))\)',
+        re.IGNORECASE)
+
+    # ── Исключения — цвета которые не показываем (слишком банальные) ──────────
+    EXCLUDED = {
+        '#FFFFFF', '#000000', '#FEFEFE', '#FDFDFD', '#FCFCFC',
+        '#010101', '#020202', '#030303',
+    }
+
+    # ── Вес файлов по важности ────────────────────────────────────────────────
+    # color.css / colors.css / variables.css → главный источник CSS-переменных
+    COLOR_FILE_NAMES = {'color.css', 'colors.css', 'variables.css', '_variables.css',
+                        'vars.css', 'theme.css', 'palette.css'}
+    # Расширения для сканирования (JS включаем для KROSS/SLOTSITE)
+    if engine in ('KROSS', 'SLOTSITE'):
+        SCAN_EXT = ('.css', '.html', '.json', '.js', '.svg')
+    else:
+        SCAN_EXT = ('.css', '.html', '.json', '.svg')
+
+    def _file_weight(fname):
+        if fname in COLOR_FILE_NAMES:
+            return 30   # главный файл палитры
+        if fname.endswith('.css'):
+            return 5    # обычные CSS
+        if fname.endswith(('.json', '.js')):
+            return 2
+        return 1        # HTML и прочее
+
+    def _extract_colors_from_text(content, weight):
+        """Извлекает все цвета из текста, добавляет в color_counts с заданным весом."""
+        # CSS-переменные — самый надёжный источник, поэтому сначала
+        for m in RE_CSS_VAR.finditer(content):
+            hex_val = m.group(1)
+            r, g, b = m.group(2), m.group(3), m.group(4)
+            h, s, l = m.group(5), m.group(6), m.group(7)
+            if hex_val:
+                c = _hex_normalize(hex_val)
+            elif r is not None:
+                c = _rgb_to_hex(r, g, b)
+            else:
+                c = _hsl_to_hex(h, s, l)
+            if c and c not in EXCLUDED:
+                color_counts[c] += weight * 2   # CSS-переменные важнее
+
+        # var() с fallback
+        for raw in RE_VAR_FALLBACK.findall(content):
+            raw = raw.strip()
+            m_rgb = RE_RGB.match(raw)
+            m_hsl = RE_HSL.match(raw)
+            if raw.startswith('#'):
+                c = _hex_normalize(raw)
+            elif m_rgb:
+                c = _rgb_to_hex(m_rgb.group(1), m_rgb.group(2), m_rgb.group(3))
+            elif m_hsl:
+                c = _hsl_to_hex(m_hsl.group(1), m_hsl.group(2), m_hsl.group(3))
+            else:
+                c = None
+            if c and c not in EXCLUDED:
+                color_counts[c] += weight
+
+        # Все rgb()/rgba() в файле
+        for m in RE_RGB.finditer(content):
+            c = _rgb_to_hex(m.group(1), m.group(2), m.group(3))
+            if c and c not in EXCLUDED:
+                color_counts[c] += weight
+
+        # Все hsl()/hsla() в файле
+        for m in RE_HSL.finditer(content):
+            c = _hsl_to_hex(m.group(1), m.group(2), m.group(3))
+            if c and c not in EXCLUDED:
+                color_counts[c] += weight
+
+        # Все HEX-цвета
+        for raw in RE_HEX.findall(content):
+            c = _hex_normalize(raw)
+            if c and c not in EXCLUDED:
+                color_counts[c] += weight
+
+    # ── Сканирование файлов шаблона ───────────────────────────────────────────
+    for root, dirs, files in os.walk(template_dir):
+        for file_name in files:
+            if not file_name.endswith(SCAN_EXT):
+                continue
+            file_path = os.path.join(root, file_name)
+            weight = _file_weight(file_name)
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                _extract_colors_from_text(content, weight)
+            except Exception:
+                pass
+
+    top_n = 30 if engine in ('KROSS', 'SLOTSITE') else 20
+    top_colors = [color for color, _ in color_counts.most_common(top_n)]
 
     return jsonify({"status": "success", "colors": top_colors})
 
@@ -218,72 +310,187 @@ def analyze_colors():
 # ============================================================
 
 def hex_to_rgb_str(hex_str):
-    """Конвертирует HEX-цвет в строку RGB-компонентов."""
+    """Конвертирует HEX-цвет в строку RGB-компонентов '255, 128, 0'."""
     hex_str = hex_str.lstrip('#')
     if len(hex_str) == 3:
-        hex_str = ''.join(c*2 for c in hex_str)
+        hex_str = ''.join(c * 2 for c in hex_str)
     if len(hex_str) >= 6:
         try:
-            return f"{int(hex_str[0:2], 16)}, {int(hex_str[2:4], 16)}, {int(hex_str[4:6], 16)}"
-        except:
+            return (f"{int(hex_str[0:2], 16)}, "
+                    f"{int(hex_str[2:4], 16)}, "
+                    f"{int(hex_str[4:6], 16)}")
+        except Exception:
             return None
     return None
 
 
+def _hex_to_hsl_str(hex_str):
+    """
+    Конвертирует HEX-цвет в строку HSL-компонентов 'H, S%, L%'.
+    Возвращает None при ошибке.
+    """
+    rgb = hex_to_rgb_str(hex_str)
+    if not rgb:
+        return None
+    try:
+        r, g, b = (x / 255.0 for x in map(int, rgb.split(',')))
+        cmax, cmin = max(r, g, b), min(r, g, b)
+        delta = cmax - cmin
+        l = (cmax + cmin) / 2.0
+
+        if delta == 0:
+            h, s = 0.0, 0.0
+        else:
+            s = delta / (1 - abs(2 * l - 1))
+            if cmax == r:
+                h = 60 * (((g - b) / delta) % 6)
+            elif cmax == g:
+                h = 60 * (((b - r) / delta) + 2)
+            else:
+                h = 60 * (((r - g) / delta) + 4)
+
+        return f"{round(h)}, {round(s * 100)}%, {round(l * 100)}%"
+    except Exception:
+        return None
+
+
 def replace_custom_colors(dst_site_dir, old_colors, new_colors):
-    """Заменяет цвета (HEX, short-HEX, RGB, RGBA) во всех файлах сайта."""
-    replacements = []
+    """
+    Заменяет цвета во всех файлах сайта.
+    Поддерживаемые форматы старого цвета (на входе — HEX):
+      • #RRGGBB / #RGB          — прямая HEX-форма
+      • #rrggbb                 — lowercase HEX
+      • #ABC (короткая форма)   — если R==G, G==G, B==B
+      • rgb(r, g, b)            — целые значения с любыми пробелами
+      • rgba(r, g, b, a)        — сохраняет оригинальный alpha
+      • hsl(h, s%, l%)          — если цвет был задан через hsl
+      • hsla(h, s%, l%, a)      — сохраняет оригинальный alpha
+    Новый цвет задаётся в HEX (#RRGGBB), и конвертируется в нужный
+    формат автоматически при замене.
+    """
+    replacements = []  # список (compiled_re, replacement_template_or_str, kind)
+
     for old, new in zip(old_colors, new_colors):
         old_clean = old.strip().lower()
         new_clean = new.strip().lower()
 
-        if old_clean and new_clean and new_clean != old_clean and new_clean != "без изм.":
+        skip = (
+            not old_clean
+            or not new_clean
+            or new_clean == old_clean
+            or new_clean in ('без изм.', 'no change', '-', '')
+        )
+        if skip:
+            continue
+
+        # Нормализуем оба цвета в #rrggbb для внутренней работы
+        def _norm_hex(h):
+            h = h.strip().lstrip('#')
+            if len(h) == 3:
+                h = h[0]*2 + h[1]*2 + h[2]*2
+            return '#' + h if len(h) == 6 else None
+
+        old_hex = _norm_hex(old_clean)
+        new_hex = _norm_hex(new_clean)
+        if not old_hex or not new_hex:
+            continue
+
+        old_upper = old_hex.upper()
+        new_upper = new_hex.upper()
+
+        # 1. HEX верхний регистр  #AABBCC
+        replacements.append((
+            re.compile(re.escape(old_upper) + r'(?![0-9a-fA-F])', re.IGNORECASE),
+            new_upper
+        ))
+
+        # 2. Короткая HEX-форма #ABC (только если все пары совпадают)
+        o = old_upper
+        if o[1]==o[2] and o[3]==o[4] and o[5]==o[6]:
+            short_old = '#' + o[1] + o[3] + o[5]
+            # Короткую форму заменяем полным HEX нового цвета
             replacements.append((
-                re.compile(re.escape(old_clean) + r'(?![0-9a-fA-F])', re.IGNORECASE),
-                new_clean
+                re.compile(re.escape(short_old) + r'(?![0-9a-fA-F])', re.IGNORECASE),
+                new_upper
             ))
-            # Короткая HEX-форма (#aabbcc → #abc)
-            if (len(old_clean) == 7
-                    and old_clean[1] == old_clean[2]
-                    and old_clean[3] == old_clean[4]
-                    and old_clean[5] == old_clean[6]):
-                short_hex = '#' + old_clean[1] + old_clean[3] + old_clean[5]
-                replacements.append((
-                    re.compile(re.escape(short_hex) + r'(?![0-9a-fA-F])', re.IGNORECASE),
-                    new_clean
-                ))
-            # RGB / RGBA
-            old_rgb = hex_to_rgb_str(old_clean)
-            new_rgb = hex_to_rgb_str(new_clean)
-            if old_rgb and new_rgb:
-                old_rgb_regex = old_rgb.replace(' ', r'\s*')
-                replacements.append((
-                    re.compile(r'rgb\(\s*' + old_rgb_regex + r'\s*\)', re.IGNORECASE),
-                    f"rgb({new_rgb})"
-                ))
-                replacements.append((
-                    re.compile(r'rgba\(\s*' + old_rgb_regex + r'\s*,', re.IGNORECASE),
-                    f"rgba({new_rgb},"
-                ))
+
+        # 3. rgb(r, g, b)  →  rgb(nr, ng, nb)
+        old_rgb = hex_to_rgb_str(old_hex)
+        new_rgb = hex_to_rgb_str(new_hex)
+        if old_rgb and new_rgb:
+            # Допускаем любые пробелы между компонентами
+            r1, g1, b1 = old_rgb.split(', ')
+            old_rgb_re = (r'\s*' + re.escape(r1.strip()) +
+                          r'\s*,\s*' + re.escape(g1.strip()) +
+                          r'\s*,\s*' + re.escape(b1.strip()) + r'\s*')
+
+            # rgb(...)  — без alpha
+            replacements.append((
+                re.compile(r'rgb\(' + old_rgb_re + r'\)', re.IGNORECASE),
+                f'rgb({new_rgb})'
+            ))
+
+            # rgba(..., alpha)  — сохраняем alpha через группу захвата
+            replacements.append((
+                re.compile(r'rgba\(' + old_rgb_re + r'(,[^)]+)\)', re.IGNORECASE),
+                f'rgba({new_rgb}\\1)'
+            ))
+
+        # 4. hsl(h, s%, l%)  →  hsl(nh, ns%, nl%)
+        old_hsl = _hex_to_hsl_str(old_hex)
+        new_hsl = _hex_to_hsl_str(new_hex)
+        if old_hsl and new_hsl:
+            h1, s1, l1 = old_hsl.split(', ')
+            # Допускаем ±2° для h, ±1% для s/l (погрешность round-trip)
+            h_val = int(h1)
+            s_val = int(s1.rstrip('%'))
+            l_val = int(l1.rstrip('%'))
+
+            old_hsl_re = (
+                r'(' + '|'.join(str(v) for v in range(
+                    max(0, h_val-2), min(361, h_val+3))) + r')'
+                r'\s*,\s*'
+                r'(' + '|'.join(str(v)+'%?' for v in range(
+                    max(0, s_val-1), min(101, s_val+2))) + r')'
+                r'\s*,\s*'
+                r'(' + '|'.join(str(v)+'%?' for v in range(
+                    max(0, l_val-1), min(101, l_val+2))) + r')'
+                r'\s*'
+            )
+            nh, ns, nl = new_hsl.split(', ')
+
+            # hsl(...)
+            replacements.append((
+                re.compile(r'hsl\(\s*' + old_hsl_re + r'\)', re.IGNORECASE),
+                f'hsl({nh}, {ns}, {nl})'
+            ))
+
+            # hsla(..., alpha)
+            replacements.append((
+                re.compile(r'hsla\(\s*' + old_hsl_re + r'(,[^)]+)\)', re.IGNORECASE),
+                f'hsla({nh}, {ns}, {nl}\\4)'
+            ))
 
     if not replacements:
         return
 
+    scan_ext = ('.html', '.css', '.js', '.json', '.svg', '.webmanifest')
     for root, dirs, files in os.walk(dst_site_dir):
         for file_name in files:
-            if file_name.endswith(('.html', '.css', '.js', '.json', '.svg')):
-                file_path = os.path.join(root, file_name)
-                try:
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        content = f.read()
-                    new_content = content
-                    for pattern, replacement in replacements:
-                        new_content = pattern.sub(replacement, new_content)
-                    if content != new_content:
-                        with open(file_path, 'w', encoding='utf-8') as f:
-                            f.write(new_content)
-                except:
-                    pass
+            if not file_name.endswith(scan_ext):
+                continue
+            file_path = os.path.join(root, file_name)
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                new_content = content
+                for pattern, replacement in replacements:
+                    new_content = pattern.sub(replacement, new_content)
+                if new_content != content:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(new_content)
+            except Exception:
+                pass
 
 
 def bust_browser_css_cache(dst_site_dir):

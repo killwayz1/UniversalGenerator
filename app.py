@@ -1093,9 +1093,30 @@ def _parse_doc_sushi(text):
 
 def _parse_doc_kross_slotsite(text):
     """
-    Стандартный парсер с явными маркерами (h1/h2/h3/title/desc).
-    Используется движками KROSS и SLOTSITE.
+    Парсер для движков KROSS и SLOTSITE.
+    Поддерживает явные маркеры MT/MD/H1/H2/H3.
+    Исправление: если MT и MD оказались на одной строке — разбиваем их.
     """
+    # ---- Предобработка: разбиваем строки где MT и MD склеены ----
+    # Паттерн: внутри одной строки встречается "md:" или "мд:" после контента
+    INLINE_MARKERS = re.compile(
+        r'(?i)(?<!\A)\s+(md|мд|meta\s*desc(?:ription)?|description\s*seo)\s*[:\-–—]',
+    )
+
+    fixed_lines = []
+    for raw_line in text.split('\n'):
+        # Ищем второй маркер посередине строки (не в начале)
+        stripped = raw_line.strip()
+        m = INLINE_MARKERS.search(stripped)
+        if m and m.start() > 0:
+            # Разбиваем на две отдельные строки
+            fixed_lines.append(stripped[:m.start()])
+            fixed_lines.append(stripped[m.start():].strip())
+        else:
+            fixed_lines.append(raw_line)
+    text = '\n'.join(fixed_lines)
+    # ---------------------------------------------------------------
+
     data = {"seo_title": "", "meta_desc": "", "h1": "", "sections": {}}
     lines = [line.strip() for line in text.split('\n') if line.strip()]
 
@@ -1129,6 +1150,13 @@ def _parse_doc_kross_slotsite(text):
         if matched_key:
             content_after = clean_line[marker_end_pos:].strip()
             val = re.sub(r'^[:\-–—\s]+', '', content_after)
+
+            # Защита: если val содержит следующий маркер inline — обрезаем до него
+            inline_split = re.search(
+                r'\s+(?:md|мд|mt|мт|h1|h2|h3|meta\s*desc(?:ription)?)\s*[:\-–—]',
+                val, re.IGNORECASE)
+            if inline_split:
+                val = val[:inline_split.start()].strip()
 
             if not val and i + 1 < len(lines):
                 next_clean = re.sub(r'<[^>]+>', '', lines[i+1]).strip()
@@ -3022,55 +3050,11 @@ def _smart_inject_html_sushi2(file_path, json_data, site_name=None):
 def _inject_navigation_sushi2(dst_site_dir, header_links, footer_links):
     """
     Вставляет навигацию в SUSHI2-шаблоны.
-    Шапка desktop (ul.hf0d9): первые 5 пунктов видимы, остальные — в выпадающем «More ▾».
-    Шапка мобайл (ul.e7cb498): все пункты целиком (сайдбар).
-    Подвал (ul.p0e1ad8b): все footer-ссылки.
+    Шапка: ul.hf0d9 (desktop) + ul.e7cb498 (мобильное меню).
+    Подвал: ul.p0e1ad8b.
     """
-    MAX_VISIBLE = 5
-
-    # CSS для выпадашки «More ▾» — инжектируем один раз в <head>
-    MORE_CSS = """<style id="nav-more-style">
-.nav-more-item{position:relative;list-style:none}
-.nav-more-btn{background:none;border:none;cursor:pointer;font:inherit;
-  color:inherit;padding:0;display:flex;align-items:center;gap:4px;
-  white-space:nowrap;font-size:inherit;-webkit-appearance:none;
-  appearance:none;outline:none;text-decoration:none;opacity:1}
-.nav-more-btn::after{content:'▾';font-size:.75em}
-.nav-more-dropdown{display:none;position:absolute;top:100%;right:0;
-  min-width:160px;background:var(--bg-card,#1a1a2e);border:1px solid
-  var(--border-color,rgba(255,255,255,.15));border-radius:8px;
-  padding:6px 0;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-.nav-more-item:hover .nav-more-dropdown,
-.nav-more-item.open .nav-more-dropdown{display:block}
-.nav-more-dropdown li{list-style:none}
-.nav-more-dropdown a{display:block;padding:8px 16px;color:inherit;
-  text-decoration:none;white-space:nowrap;font-size:.95em}
-.nav-more-dropdown a:hover{background:rgba(255,255,255,.07)}
-</style>"""
-
-    # JS — toggle по клику (дублирует hover для тач-устройств)
-    MORE_JS = """<script id="nav-more-script">
-document.addEventListener('DOMContentLoaded',function(){
-  var btn=document.querySelector('.nav-more-btn');
-  if(!btn)return;
-  btn.addEventListener('click',function(e){
-    e.preventDefault();
-    e.stopPropagation();
-    var li=this.closest('.nav-more-item');
-    li.classList.toggle('open');
-  });
-  document.addEventListener('click',function(){
-    var li=document.querySelector('.nav-more-item');
-    if(li)li.classList.remove('open');
-  });
-});
-</script>"""
-
     h_links = list({l['url']: l for l in header_links}.values())
     f_links = list({l['url']: l for l in footer_links}.values())
-
-    visible_links = h_links[:MAX_VISIBLE]
-    overflow_links = h_links[MAX_VISIBLE:]
 
     for root, dirs, files in os.walk(dst_site_dir):
         if 'index.html' not in files:
@@ -3080,53 +3064,17 @@ document.addEventListener('DOMContentLoaded',function(){
         with open(file_path, 'r', encoding='utf-8') as f:
             soup = BeautifulSoup(f.read(), 'lxml')
 
-        # ---- Инжектируем CSS в <head> ----
-        if not soup.find('style', id='nav-more-style') and soup.head:
-            soup.head.append(BeautifulSoup(MORE_CSS, 'html.parser'))
+        for ul_class in ['hf0d9', 'e7cb498']:
+            nav_ul = soup.find('ul', class_=ul_class)
+            if nav_ul:
+                nav_ul.clear()
+                for link in h_links:
+                    li = soup.new_tag('li')
+                    a = soup.new_tag('a', rel='nofollow', href=link['url'])
+                    a.string = link['title']
+                    li.append(a)
+                    nav_ul.append(li)
 
-        # ---- Desktop nav: ul.hf0d9 ----
-        nav_ul = soup.find('ul', class_='hf0d9')
-        if nav_ul:
-            nav_ul.clear()
-
-            # Первые MAX_VISIBLE ссылок
-            for link in visible_links:
-                li = soup.new_tag('li')
-                a = soup.new_tag('a', rel='nofollow', href=link['url'])
-                a.string = link['title']
-                li.append(a)
-                nav_ul.append(li)
-
-            # Overflow → «More ▾» dropdown
-            if overflow_links:
-                more_li = soup.new_tag('li', attrs={'class': 'nav-more-item'})
-                more_btn = soup.new_tag('a', attrs={'class': 'nav-more-btn',
-                                                    'href': '#',
-                                                    'rel': 'nofollow'})
-                more_btn.string = 'More'
-                more_ul = soup.new_tag('ul', attrs={'class': 'nav-more-dropdown'})
-                for link in overflow_links:
-                    li2 = soup.new_tag('li')
-                    a2 = soup.new_tag('a', rel='nofollow', href=link['url'])
-                    a2.string = link['title']
-                    li2.append(a2)
-                    more_ul.append(li2)
-                more_li.append(more_btn)
-                more_li.append(more_ul)
-                nav_ul.append(more_li)
-
-        # ---- Mobile nav: ul.e7cb498 (все ссылки, без dropdown) ----
-        mobile_ul = soup.find('ul', class_='e7cb498')
-        if mobile_ul:
-            mobile_ul.clear()
-            for link in h_links:
-                li = soup.new_tag('li')
-                a = soup.new_tag('a', rel='nofollow', href=link['url'])
-                a.string = link['title']
-                li.append(a)
-                mobile_ul.append(li)
-
-        # ---- Footer: ul.p0e1ad8b ----
         footer_ul = soup.find('ul', class_='p0e1ad8b')
         if footer_ul:
             footer_ul.clear()
@@ -3136,10 +3084,6 @@ document.addEventListener('DOMContentLoaded',function(){
                 a.string = link['title']
                 li.append(a)
                 footer_ul.append(li)
-
-        # ---- JS toggle в конец <body> ----
-        if not soup.find('script', id='nav-more-script') and soup.body:
-            soup.body.append(BeautifulSoup(MORE_JS, 'html.parser'))
 
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(str(soup))
@@ -3221,11 +3165,7 @@ def _process_pages_sushi2(tz_df, dst_site_dir, site_name):
         page_slug      = page_url.lower().replace(' ', '-')
         normalized_url = page_url.lower().replace(' ', '')
 
-        # Пропускаем служебные строки fav/logo и eeat (не генерируем как страницы)
-        _norm_bare = re.sub(r'[^a-z]', '', normalized_url)
-        if ('fav' in _norm_bare and 'logo' in _norm_bare) or \
-                normalized_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav',
-                                   'fav\\logo', 'logo\\fav']:
+        if normalized_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']:
             continue
 
         # ---- EEAT: вложенные сервисные страницы ----

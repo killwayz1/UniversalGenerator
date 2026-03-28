@@ -29,6 +29,26 @@ def _bs4_safe_append(parent, html_str):
         parent.append(child)
 
 
+def _is_logo_fav_url(url_str):
+    """
+    Определяет, является ли значение ЧПУ | URL строкой логотипа/фавикона.
+    Нечувствительно к регистру, любому разделителю и порядку слов.
+    Примеры, которые возвращают True:
+        fav/logo  logo/fav  fav|logo  logo|fav
+        fav\\logo logo\\fav  fav-logo  logo-logo
+        fav.logo  logo fav  LOGO/FAV  lOgo\\FAV
+        logo      fav       favicon
+    """
+    s = str(url_str).strip().lower().replace(' ', '')
+    # Оба слова присутствуют одновременно — любой разделитель/порядок
+    if 'logo' in s and ('fav' in s or 'favicon' in s):
+        return True
+    # Одиночное слово
+    if s in ('logo', 'fav', 'favicon'):
+        return True
+    return False
+
+
 # ============================================================
 # TEMPLATE ENGINE DETECTION
 # ============================================================
@@ -3128,8 +3148,7 @@ def _process_pages_sushi2(tz_df, dst_site_dir, site_name):
     for index, row in tz_df.iterrows():
         raw_url = str(row.get('ЧПУ | URL', '')).strip().lower().replace(' ', '')
         
-        # Гибкая проверка: ищем корни 'logo' и 'fav' вместе, либо точное совпадение по одному слову
-        is_logo_fav = ('logo' in raw_url and 'fav' in raw_url) or (raw_url in ['logo', 'fav', 'favicon'])
+        is_logo_fav = _is_logo_fav_url(raw_url)
         
         if is_logo_fav:
             img_link = str(row.get('Картинки / Image', '')).strip()
@@ -3172,7 +3191,7 @@ def _process_pages_sushi2(tz_df, dst_site_dir, site_name):
         page_slug      = page_url.lower().replace(' ', '-')
         normalized_url = page_url.lower().replace(' ', '')
 
-        if normalized_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']:
+        if _is_logo_fav_url(page_url):
             continue
 
         # ---- EEAT: вложенные сервисные страницы ----
@@ -3432,8 +3451,7 @@ def _process_pages_sushi(tz_df, dst_site_dir, site_name):
     for index, row in tz_df.iterrows():
         raw_url = str(row.get('ЧПУ | URL', '')).strip().lower().replace(' ', '')
         
-        # Гибкая проверка: ищем корни 'logo' и 'fav' вместе, либо точное совпадение по одному слову
-        is_logo_fav = ('logo' in raw_url and 'fav' in raw_url) or (raw_url in ['logo', 'fav', 'favicon'])
+        is_logo_fav = _is_logo_fav_url(raw_url)
         
         if is_logo_fav:
             img_link = str(row.get('Картинки / Image', '')).strip()
@@ -3466,7 +3484,7 @@ def _process_pages_sushi(tz_df, dst_site_dir, site_name):
         page_slug = page_url.lower().replace(' ', '-')
         normalized_url = page_url.lower().replace(' ', '')
 
-        if normalized_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']: continue
+        if _is_logo_fav_url(page_url): continue
 
         # Страница EEAT — парсим политики из Google Doc
         if page_slug == 'eeat':
@@ -3723,8 +3741,7 @@ def _process_pages_kross(tz_df, dst_site_dir):
     for index, row in tz_df.iterrows():
         raw_url = str(row.get('ЧПУ | URL', '')).strip().lower().replace(' ', '')
         
-        # Гибкая проверка: ищем корни 'logo' и 'fav' вместе, либо точное совпадение по одному слову
-        is_logo_fav = ('logo' in raw_url and 'fav' in raw_url) or (raw_url in ['logo', 'fav', 'favicon'])
+        is_logo_fav = _is_logo_fav_url(raw_url)
         
         if is_logo_fav:
             img_link = str(row.get('Картинки / Image', '')).strip()
@@ -3756,7 +3773,7 @@ def _process_pages_kross(tz_df, dst_site_dir):
         page_slug = page_url.lower().replace(' ', '-')
         normalized_url = page_url.lower().replace(' ', '')
 
-        if normalized_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']: continue
+        if _is_logo_fav_url(page_url): continue
 
         if page_slug == 'eeat':
             doc_text = get_gdoc_text_and_assets(doc_link, dst_site_dir, 'eeat', engine='KROSS')
@@ -4048,8 +4065,7 @@ def _process_pages_slotsite(tz_df, dst_site_dir, template_name):
     for index, row in tz_df.iterrows():
         raw_url = str(row.get('ЧПУ | URL', '')).strip().lower().replace(' ', '')
         
-        # Гибкая проверка: ищем корни 'logo' и 'fav' вместе, либо точное совпадение по одному слову
-        is_logo_fav = ('logo' in raw_url and 'fav' in raw_url) or (raw_url in ['logo', 'fav', 'favicon'])
+        is_logo_fav = _is_logo_fav_url(raw_url)
         
         if is_logo_fav:
             img_link = str(row.get('Картинки / Image', '')).strip()
@@ -4083,7 +4099,7 @@ def _process_pages_slotsite(tz_df, dst_site_dir, template_name):
         normalized_url = page_url.lower().replace(' ', '')
 
         # Пропускаем строку лого/фав — уже обработана выше
-        if normalized_url in ['fav/logo', 'fav|logo', 'logo/fav', 'logo|fav']: continue
+        if _is_logo_fav_url(page_url): continue
 
         if page_slug == 'eeat':
             doc_text = get_gdoc_text_and_assets(doc_link, dst_site_dir, 'eeat', engine='SLOTSITE')

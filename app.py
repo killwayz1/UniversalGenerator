@@ -3721,25 +3721,6 @@ def _process_pages_sushi(tz_df, dst_site_dir, site_name):
 
                     smart_inject_html(policy_file, policy_json, engine='SUSHI', site_name=site_name)
                     pages_to_keep.append(policy_slug)
-
-                    # Замена лого/фав на сервисной странице SUSHI
-                    if global_logo_path or global_fav_path:
-                        try:
-                            with open(policy_file, 'r', encoding='utf-8') as f:
-                                sp = BeautifulSoup(f.read(), 'html.parser')
-                            if global_logo_path:
-                                for img in sp.find_all('img'):
-                                    if 'logo' in img.get('src', '').lower():
-                                        img['src'] = f"/{global_logo_path}"
-                                        img.attrs.pop('srcset', None)
-                                        img.attrs.pop('sizes', None)
-                            if global_fav_path:
-                                for lnk in sp.find_all('link', rel=lambda r: r and 'icon' in r.lower()):
-                                    lnk['href'] = f"/{global_fav_path}"
-                            with open(policy_file, 'w', encoding='utf-8') as f:
-                                f.write(str(sp))
-                        except Exception as e:
-                            print(f"❌ [SUSHI] Ошибка замены лого на политике {policy_slug}: {e}")
             continue
 
         raw_doc_text = get_gdoc_text_and_assets(doc_link, dst_site_dir, page_slug, engine='SUSHI')
@@ -3781,18 +3762,13 @@ def _process_pages_sushi(tz_df, dst_site_dir, site_name):
             page_dir = os.path.join(dst_site_dir, page_slug)
             os.makedirs(page_dir, exist_ok=True)
             target_file = os.path.join(page_dir, 'index.html')
-
-            # Сервисные страницы: всегда копируем шаблон (независимо от длины URL)
-            # Используем policy.html если доступен, иначе example.html
-            if is_service:
-                template_src = policy_path if os.path.exists(policy_path) else example_path
-                shutil.copy2(template_src, target_file)
-            elif len(page_url) <= 15:
-                shutil.copy2(example_path, target_file)
-
             if len(page_url) <= 15:
                 header_nav_links.append({'title': page_url.capitalize(), 'url': f'/{page_slug}/'})
+                shutil.copy2(example_path, target_file)
                 menu_items_js += f'{{ text: "{page_url.capitalize()}", href: "/{page_slug}/", url: "/{page_slug}/", position: "end" }},\n'
+
+        # Вставляем текст
+        smart_inject_html(target_file, json_data, engine='SUSHI', site_name=site_name)
 
         # Подмена картинок
         if downloaded_images or global_logo_path or global_fav_path:

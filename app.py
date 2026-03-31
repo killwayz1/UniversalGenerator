@@ -1824,8 +1824,29 @@ def _smart_inject_html_sushi(file_path, json_data, site_name=None):
             article_html += f"<p>{json_data['hero_desc']}</p>\n"
 
     is_policy_page = any(kw in file_path.lower() for kw in [
+        # English
         'policy', 'terms', 'conditions', 'privacy', 'rules', 'cookie', 'responsible',
-        'richtlinie', 'datenschutzbestimmungen', 'verantwortungsvolles', 'nutzungsbedingungen'
+        'legal', 'disclaimer', 'gaming', 'imprint',
+        # German
+        'richtlinie', 'datenschutz', 'verantwortung', 'nutzungsbedingungen',
+        'allgemeine', 'geschäftsbedingungen', 'agb', 'impressum', 'spielen',
+        'datenschutzerklärung', 'haftungsausschluss',
+        # Spanish
+        'condiciones', 'privacidad', 'terminos', 'responsable', 'juego',
+        # Polish
+        'regulamin', 'prywatnosci', 'odpowiedzialna', 'ciasteczka',
+        # Russian / Ukrainian
+        'konfidenс', 'конфиденц', 'услови', 'ответствен', 'куки', 'правила',
+        # French
+        'confidentialite', 'mentions', 'legales', 'cookies',
+        # Portuguese
+        'privacidade', 'termos', 'responsavel',
+        # Italian
+        'termini', 'condizioni', 'privacy', 'responsabile',
+        # Dutch
+        'voorwaarden', 'privacybeleid', 'cookiebeleid', 'verantwoord',
+        # Finnish / Swedish / Norwegian
+        'villkor', 'integritet', 'kakor', 'ansvarsfullt',
     ])
     images_to_insert = 0 if is_policy_page or is_faq_only_page else 3
     remaining_images = images_to_insert
@@ -2930,10 +2951,29 @@ def _smart_inject_html_sushi2(file_path, json_data, site_name=None):
     # ---- Тип страницы ----
     path_lower = file_path.lower()
     is_policy_page = any(kw in path_lower for kw in [
+        # English
         'policy', 'terms', 'conditions', 'privacy', 'rules', 'cookie', 'responsible',
+        'legal', 'disclaimer', 'gaming', 'imprint',
+        # German
         'richtlinie', 'datenschutz', 'verantwortung', 'nutzungsbedingungen',
-        'agb', 'allgemeine', 'impressum', 'disclaimer', 'legal', 'regulamin', 
-        'prywatnosci', 'condiciones', 'privacidad', 'terminos'
+        'allgemeine', 'geschäftsbedingungen', 'agb', 'impressum', 'spielen',
+        'datenschutzerklärung', 'haftungsausschluss',
+        # Spanish
+        'condiciones', 'privacidad', 'terminos', 'responsable', 'juego',
+        # Polish
+        'regulamin', 'prywatnosci', 'odpowiedzialna', 'ciasteczka',
+        # Russian / Ukrainian
+        'konfidenс', 'konfidenc', 'услови', 'ответствен', 'правила',
+        # French
+        'confidentialite', 'mentions', 'legales', 'cookies',
+        # Portuguese
+        'privacidade', 'termos', 'responsavel',
+        # Italian
+        'termini', 'condizioni', 'responsabile',
+        # Dutch
+        'voorwaarden', 'privacybeleid', 'cookiebeleid', 'verantwoord',
+        # Finnish / Swedish / Norwegian
+        'villkor', 'integritet', 'kakor', 'ansvarsfullt',
     ])
     is_faq_only_page = any(kw in path_lower for kw in [
         'ai-questions', 'ai_questions', 'faq', 'questions', 'вопросы'
@@ -3472,10 +3512,29 @@ def _process_pages_sushi2(tz_df, dst_site_dir, site_name):
 
         # ---- Определяем целевой файл ----
         is_service = any(kw in page_slug for kw in [
+            # English
             'policy', 'privacy', 'terms', 'cookie', 'responsible',
-            'richtlinie', 'datenschutz', 'cookies', 'rules', 'nutzungsbedingungen',
-            'agb', 'allgemeine', 'impressum', 'disclaimer', 'legal', 'regulamin', 
-            'prywatnosci', 'condiciones', 'privacidad', 'terminos'
+            'rules', 'legal', 'disclaimer', 'gaming', 'imprint',
+            # German
+            'richtlinie', 'datenschutz', 'verantwortung', 'nutzungsbedingungen',
+            'allgemeine', 'geschäftsbedingungen', 'agb', 'impressum', 'spielen',
+            'datenschutzerklärung', 'haftungsausschluss',
+            # Spanish
+            'condiciones', 'privacidad', 'terminos', 'responsable', 'juego',
+            # Polish
+            'regulamin', 'prywatnosci', 'odpowiedzialna', 'ciasteczka',
+            # Russian / Ukrainian
+            'konfidenс', 'konfidenc', 'услови', 'ответствен', 'правила',
+            # French
+            'confidentialite', 'mentions', 'legales', 'cookies',
+            # Portuguese
+            'privacidade', 'termos', 'responsavel',
+            # Italian
+            'termini', 'condizioni', 'responsabile',
+            # Dutch
+            'voorwaarden', 'privacybeleid', 'cookiebeleid', 'verantwoord',
+            # Finnish / Swedish / Norwegian
+            'villkor', 'integritet', 'kakor', 'ansvarsfullt',
         ])
 
         # ---- Скачиваем картинки (строго max 3, пропускаем для сервисных страниц) ----

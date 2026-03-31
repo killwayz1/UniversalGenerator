@@ -1825,7 +1825,8 @@ def _smart_inject_html_sushi(file_path, json_data, site_name=None):
 
     is_policy_page = any(kw in file_path.lower() for kw in [
         'policy', 'terms', 'conditions', 'privacy', 'rules', 'cookie', 'responsible',
-        'richtlinie', 'datenschutzbestimmungen', 'verantwortungsvolles', 'nutzungsbedingungen'
+        'richtlinie', 'datenschutzbestimmungen', 'verantwortungsvolles', 'nutzungsbedingungen',
+        'verantwortung', 'allgemeine'
     ])
     images_to_insert = 0 if is_policy_page or is_faq_only_page else 3
     remaining_images = images_to_insert
@@ -3475,7 +3476,7 @@ def _process_pages_sushi2(tz_df, dst_site_dir, site_name):
             'policy', 'privacy', 'terms', 'cookie', 'responsible',
             'richtlinie', 'datenschutz', 'cookies', 'rules', 'nutzungsbedingungen',
             'agb', 'allgemeine', 'impressum', 'disclaimer', 'legal', 'regulamin', 
-            'prywatnosci', 'condiciones', 'privacidad', 'terminos'
+            'prywatnosci', 'condiciones', 'privacidad', 'terminos', 'verantwortung'
         ])
 
         # ---- Скачиваем картинки (строго max 3, пропускаем для сервисных страниц) ----

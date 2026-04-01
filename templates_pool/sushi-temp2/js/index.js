@@ -28,14 +28,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  window.addEventListener('scroll', () => {
-    if (window.scrollY > 500) {
-      goTopBtn.classList.add('show');
-    } else {
-      goTopBtn.classList.remove('show');
-    }
-  });
-
   const toggleMenu = () => {
     if (body.hasAttribute('data-menu-open')) {
       body.removeAttribute('data-menu-open');

@@ -1734,7 +1734,7 @@ def _smart_inject_html_sushi(file_path, json_data, site_name=None):
         for tag in soup.find_all('meta', attrs={'name': 'apple-mobile-web-app-title'}):
             tag['content'] = site_name
 
-    is_faq_only_page = any(kw in file_path.lower() for kw in ['faq', 'questions', 'вопросы'])
+    is_faq_only_page = any(kw in file_path.lower() for kw in ['faq', 'questions', 'вопросы', 'ai-ques', 'ai que', 'fragen', 'ai_ques'])
 
     h1_tag = soup.find('h1')
     h1_injected = False
@@ -2937,7 +2937,7 @@ def _smart_inject_html_sushi2(file_path, json_data, site_name=None):
         'prywatnosci', 'condiciones', 'privacidad', 'terminos'
     ])
     is_faq_only_page = any(kw in path_lower for kw in [
-        'ai-questions', 'ai_questions', 'faq', 'questions', 'вопросы'
+        'ai-questions', 'ai_questions', 'ai-ques', 'ai_ques', 'ai que', 'faq', 'questions', 'fragen', 'вопросы'
     ])
 
     # ============================================================

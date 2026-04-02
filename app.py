@@ -3721,6 +3721,28 @@ def _process_pages_sushi(tz_df, dst_site_dir, site_name):
                     shutil.copy2(template_to_use, policy_file)
 
                     smart_inject_html(policy_file, policy_json, engine='SUSHI', site_name=site_name)
+
+                    # ── Замена лого/фав на сервисных страницах (SUSHI) ──
+                    if global_logo_path or global_fav_path:
+                        try:
+                            with open(policy_file, 'r', encoding='utf-8') as f:
+                                soup_policy = BeautifulSoup(f.read(), 'html.parser')
+                            if global_logo_path:
+                                for img in soup_policy.find_all('img'):
+                                    if 'logo' in img.get('src', '').lower():
+                                        img['src'] = f"/{global_logo_path}"
+                                        if 'srcset' in img.attrs: del img['srcset']
+                                        if 'sizes' in img.attrs: del img['sizes']
+                            if global_fav_path:
+                                for link in soup_policy.find_all(
+                                        'link', rel=lambda r: r and 'icon' in r.lower()):
+                                    link['href'] = f"/{global_fav_path}"
+                            with open(policy_file, 'w', encoding='utf-8') as f:
+                                f.write(str(soup_policy))
+                            print(f"✅ [SUSHI] Логотип применён на сервисной странице: {policy_slug}")
+                        except Exception as e:
+                            print(f"❌ [SUSHI] Ошибка замены лого на сервисной странице {policy_slug}: {e}")
+
                     pages_to_keep.append(policy_slug)
             continue
 

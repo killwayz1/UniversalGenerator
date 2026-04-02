@@ -658,33 +658,255 @@ def update_file_content(file_path, replacements):
 # IMAGE DOWNLOAD FUNCTIONS
 # ============================================================
 
+# ============================================================
+# GOOGLE DRIVE — ROBUST DOWNLOADER (кэш + каскад методов)
+# ============================================================
+
+_GDRIVE_CACHE_DIR = "_gdrive_cache"
+
+_GDRIVE_USER_AGENTS = [
+    ('Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+     'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'),
+    ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
+     'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15'),
+    ('Mozilla/5.0 (X11; Linux x86_64) '
+     'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'),
+    ('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) '
+     'Gecko/20100101 Firefox/125.0'),
+]
+
+
+def _extract_gdrive_file_id(url):
+    """Извлекает File ID из различных форматов Google Drive URL."""
+    for pat in [
+        r'/d/([a-zA-Z0-9_-]{20,})',
+        r'[?&]id=([a-zA-Z0-9_-]{20,})',
+        r'open\?id=([a-zA-Z0-9_-]{20,})',
+    ]:
+        m = re.search(pat, str(url))
+        if m:
+            return m.group(1)
+    return None
+
+
+def _gdrive_cache_lookup(file_id):
+    """Ищет файл в локальном кэше по File ID. Возвращает путь или None."""
+    if not file_id:
+        return None
+    import glob as _glob
+    hits = _glob.glob(os.path.join(_GDRIVE_CACHE_DIR, f"{file_id}.*"))
+    if hits:
+        best = max(hits, key=os.path.getsize, default=None)
+        if best and os.path.getsize(best) > 512:
+            return best
+    plain = os.path.join(_GDRIVE_CACHE_DIR, file_id)
+    if os.path.exists(plain) and os.path.getsize(plain) > 512:
+        return plain
+    return None
+
+
+def _gdrive_cache_store(file_id, src_path):
+    """Сохраняет успешно скачанный файл в кэш-директорию."""
+    if not file_id or not src_path or not os.path.exists(src_path):
+        return
+    try:
+        os.makedirs(_GDRIVE_CACHE_DIR, exist_ok=True)
+        ext = os.path.splitext(src_path)[1] or ''
+        cache_path = os.path.join(_GDRIVE_CACHE_DIR, f"{file_id}{ext}")
+        if not os.path.exists(cache_path):
+            shutil.copy2(src_path, cache_path)
+    except Exception:
+        pass
+
+
+def _is_html_content(file_path):
+    """
+    Проверяет первые байты файла — не является ли он HTML-страницей ошибки
+    (Google Drive возвращает HTML вместо файла при rate-limit).
+    """
+    try:
+        with open(file_path, 'rb') as f:
+            header = f.read(600)
+        text = header.decode('utf-8', errors='ignore').lower()
+        return '<html' in text or '<!doctype' in text
+    except Exception:
+        return False
+
+
+def _gdrive_try_gdown(url, dest_dir):
+    """Метод 1: скачивание через gdown."""
+    try:
+        result = gdown.download(url=url, output=dest_dir + '/', quiet=True, fuzzy=True)
+        if result and os.path.exists(result) and os.path.getsize(result) > 512:
+            return result
+    except Exception as e:
+        print(f"    [gdown] ошибка: {e}")
+    return None
+
+
+def _gdrive_try_requests(file_id, dest_dir):
+    """
+    Метод 2+3: requests с confirm-токеном и Google usercontent endpoint.
+    Перебирает rotating User-Agents.
+    """
+    import time as _time
+    if not file_id:
+        return None
+
+    ua = random.choice(_GDRIVE_USER_AGENTS)
+    headers = {'User-Agent': ua}
+    session = requests.Session()
+
+    candidate_urls = [
+        f'https://drive.google.com/uc?id={file_id}&export=download',
+        f'https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm=t',
+        f'https://drive.google.com/uc?id={file_id}&export=download&confirm=t',
+    ]
+
+    for base_url in candidate_urls:
+        try:
+            resp = session.get(base_url, headers=headers, stream=True,
+                               verify=False, timeout=30)
+
+            # Ищем confirm-токен в куках
+            confirm = None
+            for key, value in resp.cookies.items():
+                if 'download_warning' in key or 'download_manual' in key:
+                    confirm = value
+                    break
+
+            if confirm:
+                resp = session.get(
+                    base_url, params={'confirm': confirm},
+                    headers=headers, stream=True, verify=False, timeout=30)
+
+            content_type = resp.headers.get('Content-Type', '')
+            # Если всё ещё HTML — пробуем следующий URL
+            if resp.status_code != 200 or 'html' in content_type.lower():
+                _time.sleep(random.uniform(0.3, 0.8))
+                continue
+
+            # Определяем имя файла из Content-Disposition
+            content_disp = resp.headers.get('Content-Disposition', '')
+            fname_m = re.search(
+                r'filename[*]?=(?:UTF-8\'\')?["\']?([^"\';\r\n]+)',
+                content_disp, re.IGNORECASE)
+            if fname_m:
+                filename = fname_m.group(1).strip().strip('"\'')
+            else:
+                _ext_map = {
+                    'image/png': '.png', 'image/jpeg': '.jpg',
+                    'image/webp': '.webp', 'image/gif': '.gif',
+                    'image/svg+xml': '.svg', 'image/x-icon': '.ico',
+                    'image/vnd.microsoft.icon': '.ico',
+                }
+                ct_base = content_type.split(';')[0].strip()
+                filename = f"{file_id}{_ext_map.get(ct_base, '.bin')}"
+
+            save_path = os.path.join(dest_dir, filename)
+            with open(save_path, 'wb') as fh:
+                for chunk in resp.iter_content(32768):
+                    if chunk:
+                        fh.write(chunk)
+
+            if os.path.exists(save_path) and os.path.getsize(save_path) > 512:
+                return save_path
+
+        except Exception as e:
+            print(f"    [requests:{base_url[:55]}…] ошибка: {e}")
+
+        _time.sleep(random.uniform(0.5, 1.5))
+
+    return None
+
+
+def _download_gdrive_file_robust(url, dest_dir, retries=3):
+    """
+    Надёжное скачивание одного файла с Google Drive.
+
+    Слои защиты:
+      1. Диск-кэш по File ID — повторные запросы обслуживаются без сети.
+      2. gdown (основной метод).
+      3. requests + confirm-token + rotating User-Agent.
+      4. Google usercontent endpoint с confirm=t.
+    После успеха файл сохраняется в кэш для будущих запросов.
+    """
+    import time as _time
+
+    url = str(url).strip()
+    file_id = _extract_gdrive_file_id(url)
+
+    # ── 1. Проверяем кэш ──────────────────────────────────────
+    cached = _gdrive_cache_lookup(file_id)
+    if cached:
+        ext = os.path.splitext(cached)[1]
+        dest_name = os.path.basename(cached)
+        dest_file = os.path.join(dest_dir, dest_name)
+        if os.path.exists(dest_file):
+            dest_file = os.path.join(dest_dir, f"{file_id[:12]}{ext}")
+        try:
+            shutil.copy2(cached, dest_file)
+            print(f"💾 Кэш: {dest_name} (id={file_id[:14]}…)")
+            return dest_file
+        except Exception:
+            pass  # Если копирование из кэша не удалось — идём скачивать
+
+    # ── 2–4. Скачиваем с повторами и экспоненциальным backoff ─
+    for attempt in range(1, retries + 1):
+        if attempt > 1:
+            delay = random.uniform(3.0, 6.0) * attempt
+            print(f"⏳ Повтор {attempt}/{retries} через {delay:.1f}с… ({url[:60]}…)")
+            _time.sleep(delay)
+
+        # Метод 1: gdown
+        result = _gdrive_try_gdown(url, dest_dir)
+        if result:
+            if not _is_html_content(result):
+                _gdrive_cache_store(file_id, result)
+                return result
+            print("⚠️ gdown вернул HTML-страницу (rate limit). Пробуем requests…")
+            try:
+                os.remove(result)
+            except Exception:
+                pass
+
+        # Методы 2–3: requests + usercontent
+        result = _gdrive_try_requests(file_id, dest_dir)
+        if result:
+            if not _is_html_content(result):
+                _gdrive_cache_store(file_id, result)
+                return result
+            print("⚠️ requests вернул HTML-страницу. Следующая попытка…")
+            try:
+                os.remove(result)
+            except Exception:
+                pass
+
+    print(f"❌ Не удалось скачать после {retries} попыток: {url[:80]}")
+    return None
+
+
+# ── Устаревшая функция SLOTSITE — теперь использует robust-загрузчик ──────────
 def download_gdrive_image(drive_url, save_path):
     """
-    Простая загрузка одного файла с Google Drive через requests.
-    Используется движком SLOTSITE.
+    Загрузка одного файла с Google Drive для движка SLOTSITE.
+    Использует надёжный загрузчик с кэшем и fallback-методами.
     """
-    match = re.search(r'/d/([a-zA-Z0-9_-]+)', drive_url)
-    if match:
-        file_id = match.group(1)
-        url = f'https://drive.google.com/uc?id={file_id}'
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    try:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    except Exception:
+        pass
+    file_id = _extract_gdrive_file_id(drive_url)
+    if not file_id:
+        return
+
+    dest_dir = os.path.dirname(save_path)
+    result = _download_gdrive_file_robust(drive_url, dest_dir)
+    if result and os.path.exists(result):
         try:
-            session = requests.Session()
-            response = session.get(
-                url, params={'export': 'download'}, stream=True, verify=False, headers=headers)
-            for key, value in response.cookies.items():
-                if key.startswith('download_warning'):
-                    response = session.get(
-                        url, params={'export': 'download', 'confirm': value},
-                        stream=True, verify=False, headers=headers)
-                    break
-            if response.status_code == 200:
-                os.makedirs(os.path.dirname(save_path), exist_ok=True)
-                with open(save_path, 'wb') as f:
-                    for chunk in response.iter_content(32768):
-                        if chunk:
-                            f.write(chunk)
-        except:
+            if os.path.abspath(result) != os.path.abspath(save_path):
+                shutil.move(result, save_path)
+        except Exception:
             pass
 
 
@@ -709,14 +931,18 @@ def download_and_convert_gdrive_images(drive_links_str, page_slug, dst_site_dir,
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
             if 'folder' in drive_links_str:
-                gdown.download_folder(
-                    url=drive_links_str, output=temp_dir, quiet=True, use_cookies=False)
+                # Для папок сначала пробуем gdown, при ошибке — пропускаем
+                try:
+                    gdown.download_folder(
+                        url=drive_links_str, output=temp_dir, quiet=True, use_cookies=False)
+                except Exception as folder_err:
+                    print(f"⚠️ gdown_folder ошибка: {folder_err}")
             else:
                 urls = re.findall(r'(https?://[^\s,]+)', drive_links_str)
                 if not urls:
                     urls = [drive_links_str]
                 for url in urls:
-                    gdown.download(url=url, output=temp_dir, quiet=True, fuzzy=True)
+                    _download_gdrive_file_robust(url, temp_dir)
         except Exception as e:
             print(f"❌ Ошибка загрузки по ссылке: {e}")
 
@@ -3862,8 +4088,11 @@ def _download_and_convert_kross(drive_links_str, page_slug, dst_site_dir, is_log
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
             if 'folder' in drive_links_str:
-                gdown.download_folder(
-                    url=drive_links_str, output=temp_dir, quiet=True, use_cookies=False)
+                try:
+                    gdown.download_folder(
+                        url=drive_links_str, output=temp_dir, quiet=True, use_cookies=False)
+                except Exception as folder_err:
+                    print(f"⚠️ [KROSS] gdown_folder ошибка: {folder_err}")
             else:
                 urls = re.findall(r'(https?://[^\s,]+)', drive_links_str)
                 if not urls:
@@ -3873,7 +4102,7 @@ def _download_and_convert_kross(drive_links_str, page_slug, dst_site_dir, is_log
                     # файлы с одинаковыми именами не перезаписывали друг друга
                     sub_dir = os.path.join(temp_dir, str(idx))
                     os.makedirs(sub_dir, exist_ok=True)
-                    gdown.download(url=url, output=sub_dir + '/', quiet=True, fuzzy=True)
+                    _download_gdrive_file_robust(url, sub_dir)
         except Exception as e:
             print(f"❌ [KROSS] Ошибка загрузки: {e}")
  
@@ -4194,7 +4423,7 @@ def _download_and_convert_slotsite(drive_links_str, page_slug, dst_site_dir, is_
                     # файлы с одинаковыми именами не перезаписывали друг друга
                     sub_dir = os.path.join(temp_dir, str(idx))
                     os.makedirs(sub_dir, exist_ok=True)
-                    gdown.download(url=url, output=sub_dir + '/', quiet=True, fuzzy=True)
+                    _download_gdrive_file_robust(url, sub_dir)
         except Exception as e:
             print(f"❌ [SLOTSITE] Ошибка загрузки: {e}")
 
@@ -4774,5 +5003,32 @@ def download_site(domain):
     return "Архив не найден", 404
 
 
+@app.route('/cache/info', methods=['GET'])
+def cache_info():
+    """Возвращает информацию о локальном кэше Google Drive."""
+    import glob as _glob
+    files = _glob.glob(os.path.join(_GDRIVE_CACHE_DIR, '*'))
+    total_size = sum(os.path.getsize(f) for f in files if os.path.isfile(f))
+    return jsonify({
+        "status": "ok",
+        "cache_dir": _GDRIVE_CACHE_DIR,
+        "files_count": len(files),
+        "total_size_mb": round(total_size / 1024 / 1024, 2),
+    })
+
+
+@app.route('/cache/clear', methods=['POST'])
+def cache_clear():
+    """Очищает локальный кэш Google Drive (без перезапуска хоста)."""
+    try:
+        if os.path.exists(_GDRIVE_CACHE_DIR):
+            shutil.rmtree(_GDRIVE_CACHE_DIR)
+            os.makedirs(_GDRIVE_CACHE_DIR, exist_ok=True)
+        return jsonify({"status": "ok", "message": "Кэш Google Drive очищен."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+
 if __name__ == '__main__':
+    os.makedirs(_GDRIVE_CACHE_DIR, exist_ok=True)
     app.run(debug=True, port=5000)
